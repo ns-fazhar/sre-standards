@@ -1,0 +1,165 @@
+name: SRE Checks (Reusable)
+
+on:
+  workflow_call:
+    inputs:
+      severity:
+        description: 'Minimum severity to enforce (blocking or warning)'
+        type: string
+        default: 'blocking'
+      fail_on_issues:
+        description: 'Fail workflow if issues found'
+        type: boolean
+        default: false
+
+jobs:
+  sre-operability-check:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Checkout service repository
+        uses: actions/checkout@v4
+
+      - name: Checkout SRE standards (central repo)
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository_owner }}/sre-standards
+          path: .sre-standards
+          ref: main
+
+      - name: Show SRE standards version
+        run: |
+          echo "📦 Using SRE standards version: $(cat .sre-standards/VERSION)"
+          echo ""
+
+      - name: Run operability checks
+        id: checks
+        continue-on-error: true
+        run: |
+          # Run checks from central repo
+          .sre-standards/generated/check-operability.sh 2>&1 | tee check-output.txt
+          EXIT_CODE=${PIPESTATUS[0]}
+
+          echo "exit_code=$EXIT_CODE" >> $GITHUB_OUTPUT
+
+          # Always succeed at this stage - we'll decide whether to fail later
+          exit 0
+
+      - name: Post PR comment
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const output = fs.readFileSync('check-output.txt', 'utf8');
+            const exitCode = '${{ steps.checks.outputs.exit_code }}';
+            const sreVersion = fs.readFileSync('.sre-standards/VERSION', 'utf8').trim();
+
+            const status = exitCode === '0' ? '✅ PASSED' : '❌ ISSUES FOUND';
+
+            // Count issues
+            const blockingMatch = output.match(/(\d+) blocking issue/);
+            const warningsMatch = output.match(/(\d+) warning/);
+            const blocking = blockingMatch ? blockingMatch[1] : '0';
+            const warnings = warningsMatch ? warningsMatch[1] : '0';
+
+            const body = `## 🔍 SRE Operability Check: ${status}
+
+            **SRE Standards Version**: \`${sreVersion}\`
+            **Summary**: ${blocking} blocking issue(s), ${warnings} warning(s)
+
+            <details>
+            <summary>📄 Click to see detailed results</summary>
+
+            \`\`\`
+            ${output}
+            \`\`\`
+
+            </details>
+
+            ---
+
+            ${exitCode === '0'
+              ? '✅ All operability checks passed! Service meets SRE requirements.'
+              : `⚠️ Found operability issues that should be addressed.
+
+            **What to do next:**
+            - Review the issues above
+            - Fix blocking items before production deployment
+            - Consider addressing warnings to improve reliability
+
+            **Local testing:**
+            \`\`\`bash
+            # Install SRE standards (one-time)
+            curl -fsSL https://raw.githubusercontent.com/${context.repo.owner}/sre-standards/main/install.sh | bash
+
+            # Run checks locally
+            cd your-service
+            make sre-check
+
+            # Or run directly
+            curl -fsSL https://raw.githubusercontent.com/${context.repo.owner}/sre-standards/main/generated/check-operability.sh | bash
+            \`\`\`
+            `}
+
+            ---
+            🤖 Checks powered by [sre-standards](https://github.com/${context.repo.owner}/sre-standards) v${sreVersion}
+            ${inputs.fail_on_issues ? '⚠️ This check is configured to BLOCK merges on failures' : 'ℹ️ This check provides guidance only and does not block merges'}
+            `;
+
+            // Find existing comment
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const botComment = comments.find(comment =>
+              comment.user.type === 'Bot' &&
+              comment.body.includes('SRE Operability Check')
+            );
+
+            // Create or update comment
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: body
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: body
+              });
+            }
+
+      - name: Determine workflow result
+        if: inputs.fail_on_issues
+        run: |
+          EXIT_CODE="${{ steps.checks.outputs.exit_code }}"
+          if [ "$EXIT_CODE" != "0" ]; then
+            echo "❌ SRE checks failed and fail_on_issues is true"
+            echo "This PR cannot be merged until issues are resolved"
+            exit 1
+          fi
+
+      - name: Summary
+        run: |
+          EXIT_CODE="${{ steps.checks.outputs.exit_code }}"
+          FAIL_ON_ISSUES="${{ inputs.fail_on_issues }}"
+
+          if [ "$EXIT_CODE" = "0" ]; then
+            echo "✅ All SRE operability checks passed"
+          else
+            if [ "$FAIL_ON_ISSUES" = "true" ]; then
+              echo "❌ SRE checks found issues (blocking merge)"
+            else
+              echo "⚠️ SRE checks found issues (guidance only, not blocking)"
+            fi
+          fi
