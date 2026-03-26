@@ -29,7 +29,7 @@ else
     echo "📦 Cloning SRE standards repository..."
     # Replace with your actual repo URL
     git clone https://github.com/$(git config --get remote.origin.url | cut -d: -f2 | cut -d/ -f1)/sre-standards.git "$REPO_DIR" 2>/dev/null || \
-    git clone https://github.com/your-org/sre-standards.git "$REPO_DIR"
+    git clone https://github.com/ns-fazhar/sre-standards.git "$REPO_DIR"
 fi
 
 # Symlink skills

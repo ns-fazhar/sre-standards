@@ -97,7 +97,7 @@ on: [pull_request]
 
 jobs:
   sre:
-    uses: your-org/sre-standards/.github/workflows/sre-checks-reusable.yml@main
+    uses: ns-fazhar/sre-standards/.github/workflows/sre-checks-reusable.yml@main
     with:
       fail_on_issues: false  # Set true to block PRs with issues
 ```
@@ -108,7 +108,7 @@ jobs:
 
 ```bash
 # One-time install
-curl -fsSL https://raw.githubusercontent.com/your-org/sre-standards/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/install.sh | bash
 
 # Use in your service
 cd my-service
@@ -124,7 +124,7 @@ sre-sync
 ```makefile
 # your-service/Makefile
 sre-check:
-	@curl -fsSL https://raw.githubusercontent.com/your-org/sre-standards/main/generated/check-operability.sh | bash
+	@curl -fsSL https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/generated/check-operability.sh | bash
 
 # Or if you have local copy:
 sre-check-local:
