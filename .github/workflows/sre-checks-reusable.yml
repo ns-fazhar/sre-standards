@@ -92,17 +92,30 @@ jobs:
             - Fix blocking items before production deployment
             - Consider addressing warnings to improve reliability
 
-            **Local testing:**
+            **Option 1: Quick local check**
             \`\`\`bash
-            # Install SRE standards (one-time)
-            curl -fsSL https://raw.githubusercontent.com/${context.repo.owner}/sre-standards/main/install.sh | bash
-
-            # Run checks locally
-            cd your-service
+            # Run checks locally (30 seconds)
             make sre-check
 
             # Or run directly
             curl -fsSL https://raw.githubusercontent.com/${context.repo.owner}/sre-standards/main/generated/check-operability.sh | bash
+            \`\`\`
+
+            **Option 2: Interactive fixing with Claude (Recommended)**
+            \`\`\`bash
+            # One-time install Claude skills
+            curl -fsSL https://raw.githubusercontent.com/${context.repo.owner}/sre-standards/main/install.sh | bash
+
+            # Get interactive help fixing issues
+            cd your-service
+            claude code
+            > /operability-check
+
+            # Claude will:
+            # - Analyze your code deeply
+            # - Explain each issue with context
+            # - Provide step-by-step fix instructions
+            # - Answer your questions interactively
             \`\`\`
             `}
 
