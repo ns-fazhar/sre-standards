@@ -57,6 +57,7 @@ jobs:
             const output = fs.readFileSync('check-output.txt', 'utf8');
             const exitCode = '${{ steps.checks.outputs.exit_code }}';
             const sreVersion = fs.readFileSync('.sre-standards/VERSION', 'utf8').trim();
+            const failOnIssues = '${{ inputs.fail_on_issues }}' === 'true';
 
             const status = exitCode === '0' ? '✅ PASSED' : '❌ ISSUES FOUND';
 
@@ -107,7 +108,7 @@ jobs:
 
             ---
             🤖 Checks powered by [sre-standards](https://github.com/${context.repo.owner}/sre-standards) v${sreVersion}
-            ${inputs.fail_on_issues ? '⚠️ This check is configured to BLOCK merges on failures' : 'ℹ️ This check provides guidance only and does not block merges'}
+            ${failOnIssues ? '⚠️ This check is configured to BLOCK merges on failures' : 'ℹ️ This check provides guidance only and does not block merges'}
             `;
 
             // Find existing comment
