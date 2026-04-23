@@ -38,9 +38,9 @@ Think of it as a **broadcast tower** 📡:
 │                    sre-standards (Central)                  │
 │  ┌──────────────────────────────────────────────────────┐  │
 │  │  1 YAML file → Auto-generates:                       │  │
-│  │     • Shell scripts for CI/CD                        │  │
+│  │     • Shell scripts for local/PR validation          │  │
 │  │     • GitHub Actions workflows                       │  │
-│  │     • Claude AI skills                               │  │
+│  │     • Claude AI skills for interactive dev           │  │
 │  └──────────────────────────────────────────────────────┘  │
 └─────────────────────────────┬───────────────────────────────┘
                               │
