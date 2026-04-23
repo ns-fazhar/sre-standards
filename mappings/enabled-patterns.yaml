@@ -1,0 +1,131 @@
+# SRE Standards - Enabled Pattern Configuration
+# Owner: SRE Team
+# Last Updated: 2026-04-15
+#
+# This file controls which patterns are enforced across ALL services.
+# Services reference this repo via GitHub Actions and curl.
+# To enable/disable a pattern, simply add/remove from the lists below.
+
+metadata:
+  version: "4.0.0"
+  last_updated: "2026-04-23"
+  maintainer: "SRE Team"
+  description: "Central control for SRE pattern enforcement"
+
+# ========================================
+# RELIABILITY & RESILIENCE (5 patterns)
+# ========================================
+sre_reliability_resilience_checks:
+  - timeout_protection          # Prevents hanging calls, resource exhaustion
+  - panic_recovery             # Prevents service crashes from goroutines
+  - resource_not_closed        # Prevents connection/file handle leaks
+  - circuit_breaker            # Prevents cascading failures
+  - missing_health_endpoint    # Essential for K8s liveness/readiness
+
+# ========================================
+# OBSERVABILITY (5 patterns)
+# ========================================
+sre_observability_checks:
+  - metrics_instrumentation    # Required for SLI tracking and monitoring
+  - central_logging           # Essential for debugging production issues
+  - duration_metrics          # Track latency/performance for SLOs
+  - request_id_propagation    # Essential for distributed tracing
+  - missing_metrics_endpoint  # Required for Prometheus scraping
+
+# ========================================
+# OPERABILITY (5 patterns)
+# ========================================
+sre_operability_checks:
+  - secrets_management        # Critical security - prevents credential leaks
+  - no_graceful_shutdown      # Prevents dropped requests during deployments
+  - env_vars_undocumented     # Config management, onboarding clarity
+  - missing_dockerfile        # Containerization standard
+  - config_not_validated      # Prevents runtime errors from bad config
+
+# ========================================
+# NPI - NEW PRODUCT INTRODUCTION (5 patterns)
+# ========================================
+sre_npi_checks:
+  - sql_injection_risk        # Critical security vulnerability prevention
+  - missing_tests             # Code quality gate, prevents regressions
+  - api_breaking_changes      # Prevents customer-facing breakage
+  - new_dependency_unapproved # Supply chain security, license compliance
+  - schema_without_migration  # Prevents data inconsistency
+
+# ========================================
+# SEVERITY LEVELS
+# ========================================
+# critical: Must fix immediately (blocks PR in future)
+# warning:  Should fix before merge (informative comment)
+# info:     Nice to have (informative comment)
+
+# ========================================
+# FUTURE PATTERNS (Coming Soon)
+# ========================================
+# These patterns are defined but not yet enabled:
+#
+# Reliability & Resilience:
+#   - unbounded_channels
+#   - context_propagation
+#   - hardcoded_endpoints
+#   - retry_with_backoff
+#   - idempotency
+#
+# Observability:
+#   - error_categorization
+#   - log_level_hardcoded
+#   - slow_query_logging
+#
+# Operability:
+#   - migration_no_rollback
+#   - missing_readme_sections
+#   - dependency_unpinned
+#   - exposed_debug_endpoints
+#   - missing_makefile_targets
+#
+# NPI:
+#   - feature_flag_presence
+#   - deprecated_components
+#   - large_binary_commits
+#   - no_rate_limiting
+#   - missing_api_documentation
+#   - environment_specific_code
+
+# ========================================
+# TOP 5 PATTERNS BY CATEGORY (Priority Enforcement)
+# ========================================
+# These are the most critical patterns for each category.
+# Multi-language support: Python, Go, Java, Scala
+# Based on: mappings/sre-top5-patterns.yaml
+
+# SRE Checks (Reliability & Resilience) - Top 5
+sre_checks:
+  - http_timeouts                 # BLOCKING - Prevents cascading failures (95%)
+  - circuit_breaker               # BLOCKING - Prevents service degradation (90%)
+  - resource_leak                 # WARNING - Prevents connection exhaustion (85%)
+  - retry_exponential_backoff     # WARNING - Graceful degradation (88%)
+  - health_readiness              # WARNING - K8s operational requirement (90%)
+
+# Operability - Top 5
+operability:
+  - no_hardcoded_secrets          # CRITICAL - Security compliance (99%)
+  - graceful_shutdown             # WARNING - Prevents dropped requests (85%)
+  - env_vars_documented           # INFO - Onboarding clarity (75%)
+  - dockerfile_present            # WARNING - Containerization standard (88%)
+  - config_validation             # INFO - Runtime error prevention (78%)
+
+# Observability - Top 5
+observability:
+  - metrics_instrumentation       # WARNING - SLI tracking foundation (92%)
+  - metrics_endpoint              # WARNING - Prometheus scraping (90%)
+  - central_logging               # WARNING - SUMO Logic integration (87%)
+  - duration_metrics              # WARNING - Latency SLO tracking (85%)
+  - request_id_propagation        # INFO - Distributed tracing (80%)
+
+# NPI (New Product Introduction) - Top 5
+npi:
+  - sql_injection                 # CRITICAL - Data breach prevention (99%)
+  - feature_flag_detection        # WARNING - Safe rollout capability (85%)
+  - database_migrations           # WARNING - Data consistency (88%)
+  - api_breaking_changes          # WARNING - Backwards compatibility (82%)
+  - test_coverage                 # WARNING - Quality gate (85%)

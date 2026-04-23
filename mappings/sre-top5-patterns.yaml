@@ -1,0 +1,1726 @@
+# SRE Top 5 Patterns - Priority Checks by Category
+# Owner: SRE Team
+# Auto-generates skills and scripts via: make generate
+
+metadata:
+  version: "1.0.0"
+  last_updated: "2026-04-23"
+  maintainer: "SRE Team"
+  description: "Top 5 most critical patterns for each SRE category"
+  languages_supported: ["python", "go", "java", "scala"]
+  observability_stack:
+    metrics: "Prometheus"
+    logging: "SUMO Logic"
+
+# ============================================================================
+# CATEGORY 1: SRE CHECKS (Reliability & Resilience)
+# Purpose: Scan for reliability/resilience patterns (circuit breakers, retries, timeouts)
+# ============================================================================
+sre_checks:
+  category_description: "Critical patterns to prevent outages and ensure resilient service behavior"
+  confidence_level: "High (85-95% across patterns)"
+
+  patterns:
+    # ========================================
+    # 1. HTTP TIMEOUTS (MOST CRITICAL)
+    # ========================================
+    - id: http_timeouts
+      name: "HTTP Timeout Protection"
+      severity: blocking
+      priority: 1
+      confidence: 95%
+      source: "Service Maturity Pattern #13 - Cascading failures"
+
+      detection:
+        # Python - requests without timeout
+        - language: python
+          pattern: 'requests\.(get|post|put|delete|patch)\([^)]*\)'
+          exclude: 'timeout\s*='
+          file_types: ["*.py"]
+          message: "HTTP call without timeout parameter"
+
+        # Go - http.Client without timeout
+        - language: go
+          pattern: 'http\.Client\s*\{'
+          exclude: 'Timeout\s*:'
+          file_types: ["*.go"]
+          message: "http.Client without Timeout field"
+
+        # Java - RestTemplate/HttpClient without timeout
+        - language: java
+          pattern: 'new RestTemplate\(\)|HttpClient\.newHttpClient\(\)'
+          exclude: 'setConnectTimeout|setReadTimeout|connectTimeout'
+          file_types: ["*.java"]
+          message: "HTTP client without timeout configuration"
+
+      guidance:
+        description: "All HTTP calls must have timeout parameters to prevent indefinite hangs"
+        impact: |
+          - Service can hang indefinitely waiting for responses
+          - Thread/goroutine pool exhaustion under load
+          - Cascading failures across microservices
+          - Unable to meet SLOs during dependency slowdowns
+        fix: "Add timeout parameter to all HTTP calls"
+        example: |
+          # Python - requests
+          # ❌ BAD - No timeout
+          response = requests.post(url, json=data)
+
+          # ✅ GOOD - With timeout
+          response = requests.post(url, json=data, timeout=10)
+
+          # ✅ BETTER - Separate connect/read timeouts
+          response = requests.post(url, json=data, timeout=(3, 10))
+
+          # Go - http.Client
+          // ❌ BAD - No timeout
+          client := &http.Client{}
+
+          // ✅ GOOD - With timeout
+          client := &http.Client{
+              Timeout: 10 * time.Second,
+          }
+
+          # Java - RestTemplate
+          // ❌ BAD - No timeout
+          RestTemplate restTemplate = new RestTemplate();
+
+          // ✅ GOOD - With timeout
+          HttpComponentsClientHttpRequestFactory factory =
+              new HttpComponentsClientHttpRequestFactory();
+          factory.setConnectTimeout(3000);
+          factory.setReadTimeout(10000);
+          RestTemplate restTemplate = new RestTemplate(factory);
+
+          # Scala - sttp
+          // ✅ GOOD - With timeout
+          val request = basicRequest
+            .get(uri"$url")
+            .readTimeout(10.seconds)
+            .response(asString)
+        references:
+          - "https://requests.readthedocs.io/en/latest/user/advanced/#timeouts"
+          - "https://pkg.go.dev/net/http#Client"
+
+    # ========================================
+    # 2. CIRCUIT BREAKER
+    # ========================================
+    - id: circuit_breaker
+      name: "Circuit Breaker for External Services"
+      severity: blocking
+      priority: 2
+      confidence: 90%
+      source: "Service Maturity Pattern #12 - Cascading failures"
+
+      detection:
+        - language: python
+          pattern: 'requests\.(get|post)'
+          exclude: 'CircuitBreaker|pybreaker'
+          file_types: ["*.py"]
+          message: "External service calls without circuit breaker protection"
+
+        - language: go
+          pattern: 'http\.Client|grpc\.Dial'
+          exclude: 'hystrix|circuitbreaker|gobreaker'
+          file_types: ["*.go"]
+          message: "External service calls without circuit breaker protection"
+
+        - language: java
+          pattern: 'RestTemplate|WebClient|HttpClient'
+          exclude: 'CircuitBreaker|@HystrixCommand|Resilience4j'
+          file_types: ["*.java"]
+          message: "External service calls without circuit breaker protection"
+
+      guidance:
+        description: "External service calls must be protected with circuit breaker pattern"
+        impact: |
+          - Cascading failures when external service degrades
+          - Wasted resources on calls to failing services
+          - No automatic recovery mechanism
+          - Increased latency as timeouts accumulate
+          - Inability to isolate and contain failures
+        fix: "Wrap external service calls with circuit breaker library"
+        example: |
+          # Python - pybreaker
+          from pybreaker import CircuitBreaker
+
+          payment_breaker = CircuitBreaker(
+              fail_max=5,              # Open after 5 failures
+              timeout_duration=60,     # Try again after 60 seconds
+          )
+
+          @payment_breaker
+          def call_payment_gateway(data):
+              return requests.post(PAYMENT_API_URL, json=data, timeout=10)
+
+          # Go - gobreaker
+          import "github.com/sony/gobreaker"
+
+          cb := gobreaker.NewCircuitBreaker(gobreaker.Settings{
+              Name:        "payment-api",
+              MaxRequests: 3,
+              Timeout:     time.Minute,
+              ReadyToTrip: func(counts gobreaker.Counts) bool {
+                  return counts.ConsecutiveFailures > 5
+              },
+          })
+
+          result, err := cb.Execute(func() (interface{}, error) {
+              return http.Get(paymentAPIURL)
+          })
+
+          # Java - Resilience4j
+          import io.github.resilience4j.circuitbreaker.CircuitBreaker;
+
+          CircuitBreaker circuitBreaker = CircuitBreaker.of("paymentService",
+              CircuitBreakerConfig.custom()
+                  .failureRateThreshold(50)
+                  .waitDurationInOpenState(Duration.ofSeconds(60))
+                  .build());
+
+          Supplier<String> decoratedSupplier = CircuitBreaker
+              .decorateSupplier(circuitBreaker, () -> callPaymentGateway(data));
+
+          # Scala - Akka Circuit Breaker
+          val breaker = new CircuitBreaker(
+              scheduler,
+              maxFailures = 5,
+              callTimeout = 10.seconds,
+              resetTimeout = 1.minute
+          )
+
+          breaker.withCircuitBreaker(callPaymentGateway(data))
+        references:
+          - "https://martinfowler.com/bliki/CircuitBreaker.html"
+          - "https://github.com/sony/gobreaker"
+          - "https://resilience4j.readme.io/docs/circuitbreaker"
+
+    # ========================================
+    # 3. RESOURCE LEAK PREVENTION
+    # ========================================
+    - id: resource_leak
+      name: "Resource Leak Prevention"
+      severity: warning
+      priority: 3
+      confidence: 85%
+      source: "Production reliability best practice"
+
+      detection:
+        # Go - HTTP response body not closed
+        - language: go
+          pattern: '\.Get\(|\.Post\(|\.Do\('
+          require_after: 'defer.*\.Body\.Close\(\)'
+          file_types: ["*.go"]
+          message: "HTTP response body not closed with defer"
+
+        # Python - files not closed
+        - language: python
+          pattern: 'open\('
+          exclude: 'with\s+open'
+          file_types: ["*.py"]
+          message: "File opened without context manager (use 'with open')"
+
+        # Java - resources not in try-with-resources
+        - language: java
+          pattern: 'new FileInputStream|new BufferedReader|new Connection'
+          exclude: 'try\s*\('
+          file_types: ["*.java"]
+          message: "Resource not using try-with-resources"
+
+      guidance:
+        description: "All resources (connections, files, HTTP responses) must be properly closed"
+        impact: |
+          - Connection pool exhaustion (cannot open new connections)
+          - File descriptor leaks (hitting OS limits)
+          - Memory leaks from unclosed HTTP response bodies
+          - Service degradation over time, requiring restarts
+        fix: "Use defer (Go), context managers (Python), try-with-resources (Java)"
+        example: |
+          # Go - HTTP Response
+          // ❌ BAD - Body not closed
+          resp, err := http.Get(url)
+          body, _ := ioutil.ReadAll(resp.Body)
+
+          // ✅ GOOD - Body closed with defer
+          resp, err := http.Get(url)
+          if err != nil {
+              return err
+          }
+          defer resp.Body.Close()
+          body, _ := ioutil.ReadAll(resp.Body)
+
+          # Python - Files
+          # ❌ BAD - File not closed
+          f = open('file.txt', 'r')
+          data = f.read()
+
+          # ✅ GOOD - Context manager ensures close
+          with open('file.txt', 'r') as f:
+              data = f.read()
+
+          # Java - Files
+          // ❌ BAD - Resource not closed
+          FileInputStream fis = new FileInputStream("file.txt");
+          int data = fis.read();
+
+          // ✅ GOOD - Try-with-resources
+          try (FileInputStream fis = new FileInputStream("file.txt")) {
+              int data = fis.read();
+          }
+
+          # Scala - Using (Scala 2.13+)
+          // ✅ GOOD - Using ensures close
+          Using(Source.fromFile("file.txt")) { source =>
+              source.getLines().toList
+          }
+        references:
+          - "https://go.dev/doc/effective_go#defer"
+          - "https://docs.oracle.com/javase/tutorial/essential/exceptions/tryResourceClose.html"
+
+    # ========================================
+    # 4. RETRY LOGIC WITH EXPONENTIAL BACKOFF
+    # ========================================
+    - id: retry_exponential_backoff
+      name: "Retry Logic with Exponential Backoff"
+      severity: warning
+      priority: 4
+      confidence: 88%
+      source: "Resilience best practice - Transient failure handling"
+
+      detection:
+        - language: python
+          pattern: 'requests\.(get|post|put|delete)'
+          exclude: '@retry|tenacity|backoff'
+          file_types: ["*.py"]
+          message: "External call without retry logic"
+
+        - language: go
+          pattern: 'http\.Client|grpc\.Dial'
+          exclude: 'retry|Retry|backoff'
+          file_types: ["*.go"]
+          message: "External call without retry logic"
+
+        - language: java
+          pattern: 'RestTemplate|HttpClient'
+          exclude: 'RetryTemplate|@Retryable|Resilience4j'
+          file_types: ["*.java"]
+          message: "External call without retry logic"
+
+      guidance:
+        description: "External service calls should implement retry logic with exponential backoff"
+        impact: |
+          - Transient failures become permanent failures
+          - No automatic recovery from temporary network issues
+          - Thundering herd problem (all clients retry simultaneously)
+          - Poor user experience for recoverable errors
+        fix: "Implement retry with exponential backoff and jitter"
+        example: |
+          # Python - tenacity
+          from tenacity import retry, stop_after_attempt, wait_exponential
+
+          @retry(
+              stop=stop_after_attempt(3),
+              wait=wait_exponential(multiplier=1, min=1, max=10)
+          )
+          def call_external_api(data):
+              return requests.post(url, json=data, timeout=10)
+
+          # Go - with backoff
+          import "github.com/cenkalti/backoff/v4"
+
+          operation := func() error {
+              resp, err := http.Get(url)
+              if err != nil {
+                  return err
+              }
+              defer resp.Body.Close()
+              return nil
+          }
+
+          err := backoff.Retry(operation, backoff.NewExponentialBackOff())
+
+          # Java - Spring Retry
+          @Retryable(
+              value = {RestClientException.class},
+              maxAttempts = 3,
+              backoff = @Backoff(delay = 1000, multiplier = 2)
+          )
+          public String callExternalApi(Data data) {
+              return restTemplate.postForObject(url, data, String.class);
+          }
+
+          # Scala - cats-retry
+          import retry._
+
+          retryingOnSomeErrors(
+              policy = RetryPolicies.exponentialBackoff[IO](1.second),
+              isWorthRetrying = _.isInstanceOf[IOException]
+          ) {
+              callExternalApi(data)
+          }
+        references:
+          - "https://github.com/jd/tenacity"
+          - "https://aws.amazon.com/blogs/architecture/exponential-backoff-and-jitter/"
+
+    # ========================================
+    # 5. HEALTH & READINESS ENDPOINTS
+    # ========================================
+    - id: health_readiness
+      name: "Health & Readiness Endpoints"
+      severity: warning
+      priority: 5
+      confidence: 90%
+      source: "Kubernetes operational requirement"
+
+      detection:
+        - language: all
+          pattern: '/health|/ready|/readiness|/healthz|/livez'
+          file_types: ["*.py", "*.go", "*.js", "*.java", "*.scala"]
+          invert: true
+          message: "No health or readiness endpoint found"
+
+      guidance:
+        description: "Service must expose /health and /ready endpoints for Kubernetes probes"
+        impact: |
+          - Kubernetes cannot verify service health
+          - Traffic routed to unhealthy pods
+          - Failed deployments not detected automatically
+          - Manual intervention required during rollouts
+          - Increased MTTR (Mean Time To Recovery)
+        fix: "Add /health (liveness) and /ready (readiness) endpoints"
+        example: |
+          # Python - Flask
+          @app.route('/health')
+          def health():
+              """Liveness probe - is the service running?"""
+              return jsonify({"status": "ok"}), 200
+
+          @app.route('/ready')
+          def readiness():
+              """Readiness probe - can service handle traffic?"""
+              try:
+                  db.execute("SELECT 1")
+                  cache.ping()
+                  return jsonify({"status": "ready"}), 200
+              except Exception as e:
+                  return jsonify({"status": "not ready"}), 503
+
+          # Go - HTTP
+          func healthHandler(w http.ResponseWriter, r *http.Request) {
+              w.WriteHeader(http.StatusOK)
+              w.Write([]byte(`{"status":"ok"}`))
+          }
+
+          func readyHandler(w http.ResponseWriter, r *http.Request) {
+              ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+              defer cancel()
+
+              if err := db.PingContext(ctx); err != nil {
+                  w.WriteHeader(http.StatusServiceUnavailable)
+                  return
+              }
+              w.WriteHeader(http.StatusOK)
+          }
+
+          # Java - Spring Boot
+          @RestController
+          public class HealthController {
+              @GetMapping("/health")
+              public ResponseEntity<Map<String, String>> health() {
+                  return ResponseEntity.ok(Map.of("status", "ok"));
+              }
+
+              @GetMapping("/ready")
+              public ResponseEntity<Map<String, String>> ready() {
+                  try {
+                      jdbcTemplate.queryForObject("SELECT 1", Integer.class);
+                      return ResponseEntity.ok(Map.of("status", "ready"));
+                  } catch (Exception e) {
+                      return ResponseEntity.status(503)
+                          .body(Map.of("status", "not ready"));
+                  }
+              }
+          }
+        references:
+          - "https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/"
+
+# ============================================================================
+# CATEGORY 2: OPERABILITY
+# Purpose: Dataflow validations, generate runbooks/playbooks for troubleshooting
+# ============================================================================
+operability:
+  category_description: "Patterns to ensure services can be operated, debugged, and maintained"
+  confidence_level: "High (75-99% across patterns)"
+
+  patterns:
+    # ========================================
+    # 1. NO HARDCODED SECRETS (MOST CRITICAL)
+    # ========================================
+    - id: no_hardcoded_secrets
+      name: "No Hardcoded Secrets"
+      severity: critical
+      priority: 1
+      confidence: 99%
+      source: "Security compliance requirement"
+
+      detection:
+        # High-entropy strings that look like secrets
+        - language: all
+          pattern: "(password|api_key|secret|token|aws_access_key|private_key)\\s*=\\s*['\"]([a-zA-Z0-9+/=]{20,})['\"]"
+          file_types: ["*.py", "*.go", "*.js", "*.java", "*.scala", "*.yaml", "*.yml"]
+          message: "Potential hardcoded secret detected"
+
+        # Common secret patterns
+        - language: all
+          pattern: "sk_live_|pk_live_|ghp_|gho_|AKIA[0-9A-Z]{16}"
+          file_types: ["*.py", "*.go", "*.js", "*.java", "*.scala"]
+          message: "API key pattern detected (Stripe, GitHub, AWS)"
+
+      guidance:
+        description: "Never hardcode secrets, passwords, or API keys in source code"
+        impact: |
+          - CRITICAL SECURITY RISK - credentials exposed in git history
+          - Potential data breach if code is leaked
+          - Compliance violations (PCI-DSS, SOC2, GDPR)
+          - Credential rotation requires code changes and deployment
+          - Cannot use different secrets for dev/staging/prod
+        fix: "Use environment variables or secret management systems (Vault, AWS Secrets Manager)"
+        example: |
+          # ❌ BAD - Hardcoded secrets
+          API_KEY = "sk_live_abc123xyz789"
+          DB_PASSWORD = "MyP@ssw0rd123"
+          AWS_SECRET = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+
+          # ✅ GOOD - Environment variables
+          import os
+
+          API_KEY = os.getenv('STRIPE_API_KEY')
+          DB_PASSWORD = os.getenv('DB_PASSWORD')
+          AWS_SECRET = os.getenv('AWS_SECRET_ACCESS_KEY')
+
+          if not API_KEY:
+              raise ValueError("STRIPE_API_KEY environment variable not set")
+
+          # ✅ BETTER - Secrets manager
+          import boto3
+
+          def get_secret(secret_name):
+              client = boto3.client('secretsmanager')
+              response = client.get_secret_value(SecretId=secret_name)
+              return json.loads(response['SecretString'])
+
+          secrets = get_secret('prod/myservice/credentials')
+          API_KEY = secrets['stripe_api_key']
+
+          # Go - Environment variables
+          apiKey := os.Getenv("STRIPE_API_KEY")
+          if apiKey == "" {
+              log.Fatal("STRIPE_API_KEY environment variable not set")
+          }
+
+          # Java - Environment variables
+          String apiKey = System.getenv("STRIPE_API_KEY");
+          if (apiKey == null) {
+              throw new IllegalStateException("STRIPE_API_KEY not set");
+          }
+        references:
+          - "https://12factor.net/config"
+          - "https://docs.aws.amazon.com/secretsmanager/"
+          - "https://www.vaultproject.io/"
+
+    # ========================================
+    # 2. GRACEFUL SHUTDOWN
+    # ========================================
+    - id: graceful_shutdown
+      name: "Graceful Shutdown"
+      severity: warning
+      priority: 2
+      confidence: 85%
+      source: "Operational concerns - avoid dropped requests"
+
+      detection:
+        # Go - Check for signal handling
+        - language: go
+          pattern: 'func main\(\)'
+          exclude: 'signal\.Notify|syscall\.SIGTERM|syscall\.SIGINT'
+          file_types: ["*.go"]
+          message: "No graceful shutdown signal handling found"
+
+        # Python - Check for signal handling
+        - language: python
+          pattern: "if __name__.*==.*['\"]__main__['\"]"
+          exclude: 'signal\.|SIGTERM|SIGINT'
+          file_types: ["*.py"]
+          message: "No graceful shutdown signal handling found"
+
+        # Java - Check for shutdown hooks
+        - language: java
+          pattern: 'public static void main'
+          exclude: 'addShutdownHook|ShutdownHook'
+          file_types: ["*.java"]
+          message: "No shutdown hook registered"
+
+      guidance:
+        description: "Service must handle SIGTERM gracefully to avoid dropping in-flight requests"
+        impact: |
+          - In-flight requests dropped during deployment
+          - Database transactions incomplete
+          - WebSocket connections abruptly closed
+          - Poor user experience during rolling updates
+          - Failed requests during pod termination
+        fix: "Implement signal handlers to gracefully drain connections before shutdown"
+        example: |
+          # Python - Flask
+          import signal
+          import sys
+
+          shutdown_requested = False
+
+          def shutdown_handler(signum, frame):
+              global shutdown_requested
+              logger.info("Shutdown signal received, draining connections...")
+              shutdown_requested = True
+              sys.exit(0)
+
+          signal.signal(signal.SIGTERM, shutdown_handler)
+          signal.signal(signal.SIGINT, shutdown_handler)
+
+          # Go - HTTP server
+          quit := make(chan os.Signal, 1)
+          signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+          <-quit
+
+          log.Println("Shutting down server gracefully...")
+          ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+          defer cancel()
+
+          if err := server.Shutdown(ctx); err != nil {
+              log.Fatal("Server forced shutdown:", err)
+          }
+
+          # Java - Spring Boot (built-in graceful shutdown)
+          # application.properties
+          server.shutdown=graceful
+          spring.lifecycle.timeout-per-shutdown-phase=30s
+
+          # Or manual shutdown hook
+          Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+              logger.info("Shutdown hook triggered");
+              // Drain connections
+          }));
+        references:
+          - "https://cloud.google.com/blog/products/containers-kubernetes/kubernetes-best-practices-terminating-with-grace"
+
+    # ========================================
+    # 3. ENVIRONMENT VARIABLES DOCUMENTED
+    # ========================================
+    - id: env_vars_documented
+      name: "Environment Variables Documented"
+      severity: info
+      priority: 3
+      confidence: 75%
+      source: "Onboarding and operational clarity"
+
+      detection:
+        - language: python
+          pattern: 'os\.getenv\(|os\.environ\[|os\.environ\.get\('
+          file_types: ["*.py"]
+          then_check:
+            file_exists: [".env.example", ".env.template", "README.md"]
+          message: "Environment variables used but no .env.example found"
+
+        - language: go
+          pattern: 'os\.Getenv\('
+          file_types: ["*.go"]
+          then_check:
+            file_exists: [".env.example", "README.md"]
+          message: "Environment variables used but no .env.example found"
+
+        - language: java
+          pattern: 'System\.getenv\('
+          file_types: ["*.java"]
+          then_check:
+            file_exists: [".env.example", "README.md"]
+          message: "Environment variables used but no .env.example found"
+
+      guidance:
+        description: "All environment variables must be documented in .env.example or README"
+        impact: |
+          - New developers cannot run service locally
+          - Missing configuration causes runtime errors
+          - Difficult onboarding experience
+          - Deployment failures in new environments
+          - Unclear configuration requirements
+        fix: "Create .env.example with all required environment variables and descriptions"
+        example: |
+          # .env.example
+          # Copy this to .env and fill in actual values
+
+          # Database Configuration
+          DB_HOST=localhost
+          DB_PORT=5432
+          DB_NAME=myservice
+          DB_USER=postgres
+          DB_PASSWORD=changeme
+
+          # External APIs
+          STRIPE_API_KEY=sk_test_...
+          SENDGRID_API_KEY=SG....
+
+          # Service Configuration
+          PORT=8080
+          LOG_LEVEL=info
+          ENVIRONMENT=development
+
+          # Optional - defaults provided if not set
+          REDIS_URL=redis://localhost:6379
+          MAX_WORKERS=4
+
+          # README.md - Configuration table
+          ## Configuration
+
+          | Variable | Required | Default | Description |
+          |----------|----------|---------|-------------|
+          | `DB_HOST` | Yes | - | PostgreSQL host |
+          | `DB_PASSWORD` | Yes | - | Database password |
+          | `STRIPE_API_KEY` | Yes | - | Stripe API key |
+          | `PORT` | No | 8080 | HTTP server port |
+          | `LOG_LEVEL` | No | info | Logging level |
+        references:
+          - "https://12factor.net/config"
+
+    # ========================================
+    # 4. DOCKERFILE PRESENT
+    # ========================================
+    - id: dockerfile_present
+      name: "Dockerfile Present"
+      severity: warning
+      priority: 4
+      confidence: 88%
+      source: "Containerization standard"
+
+      detection:
+        - language: all
+          file_exists: "Dockerfile"
+          invert: true
+          message: "No Dockerfile found"
+
+      guidance:
+        description: "Service must have Dockerfile for containerization and Kubernetes deployment"
+        impact: |
+          - Cannot deploy to Kubernetes
+          - Inconsistent runtime environments
+          - Manual deployment process required
+          - Cannot use CI/CD pipelines
+          - Dev/prod parity issues
+        fix: "Create Dockerfile with best practices (multi-stage, non-root user, security)"
+        example: |
+          # Python - Multi-stage Dockerfile
+          FROM python:3.11-slim as builder
+          WORKDIR /app
+          COPY requirements.txt .
+          RUN pip install --user --no-cache-dir -r requirements.txt
+
+          FROM python:3.11-slim
+          RUN useradd -m -u 1000 appuser
+          WORKDIR /app
+          COPY --from=builder /root/.local /home/appuser/.local
+          COPY --chown=appuser:appuser . .
+          USER appuser
+          ENV PATH=/home/appuser/.local/bin:$PATH
+          EXPOSE 8080
+          HEALTHCHECK --interval=30s CMD python -c "import requests; requests.get('http://localhost:8080/health')"
+          CMD ["python", "app.py"]
+
+          # Go - Multi-stage Dockerfile
+          FROM golang:1.21 as builder
+          WORKDIR /app
+          COPY go.mod go.sum ./
+          RUN go mod download
+          COPY . .
+          RUN CGO_ENABLED=0 GOOS=linux go build -o main .
+
+          FROM alpine:latest
+          RUN apk --no-cache add ca-certificates
+          WORKDIR /root/
+          COPY --from=builder /app/main .
+          EXPOSE 8080
+          CMD ["./main"]
+
+          # Java - Multi-stage Dockerfile
+          FROM maven:3.8-openjdk-17 as builder
+          WORKDIR /app
+          COPY pom.xml .
+          RUN mvn dependency:go-offline
+          COPY src ./src
+          RUN mvn package -DskipTests
+
+          FROM openjdk:17-slim
+          COPY --from=builder /app/target/*.jar app.jar
+          EXPOSE 8080
+          ENTRYPOINT ["java", "-jar", "app.jar"]
+        references:
+          - "https://docs.docker.com/develop/develop-images/dockerfile_best-practices/"
+
+    # ========================================
+    # 5. CONFIGURATION VALIDATION
+    # ========================================
+    - id: config_validation
+      name: "Configuration Validation"
+      severity: info
+      priority: 5
+      confidence: 78%
+      source: "Runtime error prevention"
+
+      detection:
+        - language: python
+          pattern: 'yaml\.load\(|json\.load\(|configparser\.'
+          exclude: 'validate|schema|pydantic|marshmallow'
+          file_types: ["*.py"]
+          message: "Configuration loaded without validation"
+
+        - language: go
+          pattern: 'yaml\.Unmarshal|json\.Unmarshal'
+          exclude: 'validate|Validate\(\)|validator'
+          file_types: ["*.go"]
+          message: "Configuration unmarshaled without validation"
+
+        - language: java
+          pattern: '@Value\(|@ConfigurationProperties'
+          exclude: '@Validated|@Valid'
+          file_types: ["*.java"]
+          message: "Configuration properties without validation"
+
+      guidance:
+        description: "Validate configuration at startup to fail fast on invalid config"
+        impact: |
+          - Runtime errors from invalid configuration
+          - Service starts but fails during operation
+          - Difficult to debug config issues
+          - Delayed error detection (after deployment)
+          - Unclear configuration requirements
+        fix: "Add validation schema and validate config at startup"
+        example: |
+          # Python - Pydantic
+          from pydantic import BaseSettings, Field, validator
+
+          class Config(BaseSettings):
+              db_host: str
+              db_port: int = Field(ge=1, le=65535)
+              stripe_api_key: str = Field(regex=r'^sk_(test|live)_')
+              request_timeout: int = Field(default=30, ge=1, le=300)
+
+              @validator('db_host')
+              def validate_db_host(cls, v):
+                  if not v:
+                      raise ValueError('db_host cannot be empty')
+                  return v
+
+          try:
+              config = Config()
+          except Exception as e:
+              print(f"❌ Configuration error: {e}")
+              sys.exit(1)
+
+          # Go - go-playground/validator
+          import "github.com/go-playground/validator/v10"
+
+          type Config struct {
+              DBHost         string `validate:"required,hostname"`
+              DBPort         int    `validate:"required,min=1,max=65535"`
+              StripeAPIKey   string `validate:"required,startswith=sk_"`
+              RequestTimeout int    `validate:"min=1,max=300"`
+          }
+
+          validate := validator.New()
+          if err := validate.Struct(config); err != nil {
+              log.Fatalf("Config validation failed: %v", err)
+          }
+
+          # Java - Spring Boot Validation
+          @ConfigurationProperties(prefix = "app")
+          @Validated
+          public class AppConfig {
+              @NotBlank
+              private String dbHost;
+
+              @Min(1) @Max(65535)
+              private int dbPort;
+
+              @Pattern(regexp = "^sk_(test|live)_.*")
+              private String stripeApiKey;
+          }
+        references:
+          - "https://pydantic-docs.helpmanual.io/"
+          - "https://github.com/go-playground/validator"
+
+# ============================================================================
+# CATEGORY 3: OBSERVABILITY
+# Purpose: Scan for metrics instrumentation, suggest dashboards and alerts
+# ============================================================================
+observability:
+  category_description: "Patterns to ensure visibility into service health and performance"
+  confidence_level: "High (80-92% across patterns)"
+
+  patterns:
+    # ========================================
+    # 1. METRICS INSTRUMENTATION (MOST CRITICAL)
+    # ========================================
+    - id: metrics_instrumentation
+      name: "Prometheus Metrics Instrumentation"
+      severity: warning
+      priority: 1
+      confidence: 92%
+      source: "Service Maturity Pattern #19 - SLI metrics"
+
+      detection:
+        - language: python
+          pattern: '@app\.route\(|@router\.(get|post|put|delete)'
+          exclude: '\.inc\(\)|\.observe\(\)|prometheus|@metrics'
+          file_types: ["*.py"]
+          message: "HTTP endpoint without Prometheus metrics"
+
+        - language: go
+          pattern: 'func.*Handler\(.*http\.ResponseWriter'
+          exclude: 'prometheus|metrics\.|promauto'
+          file_types: ["*.go"]
+          message: "HTTP handler without metrics instrumentation"
+
+        - language: java
+          pattern: '@(GetMapping|PostMapping|PutMapping|DeleteMapping|RequestMapping)'
+          exclude: '@Timed|@Counted|MeterRegistry'
+          file_types: ["*.java"]
+          message: "REST endpoint without metrics"
+
+      guidance:
+        description: "Critical service paths must export Prometheus metrics for SLI tracking"
+        impact: |
+          - Cannot measure service performance or SLOs
+          - No visibility into request rates, latency, errors
+          - Unable to create meaningful alerts
+          - Debugging production issues requires guesswork
+          - Cannot identify performance regressions
+        fix: "Add Prometheus counters and histograms to all critical paths"
+        example: |
+          # Python - prometheus_client
+          from prometheus_client import Counter, Histogram
+
+          request_count = Counter(
+              'http_requests_total',
+              'Total HTTP requests',
+              ['method', 'endpoint', 'status']
+          )
+
+          request_duration = Histogram(
+              'http_request_duration_seconds',
+              'HTTP request latency',
+              ['method', 'endpoint']
+          )
+
+          @app.route('/checkout', methods=['POST'])
+          @request_duration.labels(method='POST', endpoint='checkout').time()
+          def checkout():
+              try:
+                  result = process_checkout(request.json)
+                  request_count.labels(method='POST', endpoint='checkout', status='success').inc()
+                  return jsonify(result), 200
+              except Exception as e:
+                  request_count.labels(method='POST', endpoint='checkout', status='error').inc()
+                  raise
+
+          # Go - prometheus
+          var (
+              httpRequestsTotal = promauto.NewCounterVec(
+                  prometheus.CounterOpts{
+                      Name: "http_requests_total",
+                      Help: "Total HTTP requests",
+                  },
+                  []string{"method", "endpoint", "status"},
+              )
+
+              httpDuration = promauto.NewHistogramVec(
+                  prometheus.HistogramOpts{
+                      Name: "http_request_duration_seconds",
+                      Help: "HTTP request latency",
+                  },
+                  []string{"method", "endpoint"},
+              )
+          )
+
+          func checkoutHandler(w http.ResponseWriter, r *http.Request) {
+              timer := prometheus.NewTimer(httpDuration.WithLabelValues("POST", "/checkout"))
+              defer timer.ObserveDuration()
+
+              err := processCheckout(r.Body)
+              if err != nil {
+                  httpRequestsTotal.WithLabelValues("POST", "/checkout", "error").Inc()
+                  http.Error(w, err.Error(), 500)
+                  return
+              }
+              httpRequestsTotal.WithLabelValues("POST", "/checkout", "success").Inc()
+          }
+
+          # Java - Micrometer
+          @RestController
+          public class CheckoutController {
+              private final MeterRegistry registry;
+              private final Counter requestCounter;
+              private final Timer requestTimer;
+
+              @PostMapping("/checkout")
+              public ResponseEntity<?> checkout(@RequestBody CheckoutRequest req) {
+                  return requestTimer.record(() -> {
+                      try {
+                          var result = processCheckout(req);
+                          requestCounter.increment();
+                          return ResponseEntity.ok(result);
+                      } catch (Exception e) {
+                          registry.counter("http_requests_total",
+                              "method", "POST",
+                              "endpoint", "/checkout",
+                              "status", "error").increment();
+                          throw e;
+                      }
+                  });
+              }
+          }
+        references:
+          - "https://prometheus.io/docs/practices/instrumentation/"
+          - "https://github.com/prometheus/client_python"
+          - "https://micrometer.io/docs"
+
+    # ========================================
+    # 2. METRICS ENDPOINT
+    # ========================================
+    - id: metrics_endpoint
+      name: "Metrics Endpoint"
+      severity: warning
+      priority: 2
+      confidence: 90%
+      source: "Prometheus scraping requirement"
+
+      detection:
+        - language: all
+          pattern: '/metrics'
+          file_types: ["*.py", "*.go", "*.js", "*.java", "*.scala"]
+          invert: true
+          message: "No /metrics endpoint found for Prometheus scraping"
+
+      guidance:
+        description: "Service must expose /metrics endpoint for Prometheus to scrape"
+        impact: |
+          - Prometheus cannot collect metrics from service
+          - No monitoring dashboards or alerts possible
+          - Service invisible to observability platform
+          - Cannot track SLOs or performance
+        fix: "Expose /metrics endpoint with Prometheus client library"
+        example: |
+          # Python - Flask
+          from prometheus_client import make_wsgi_app
+          from werkzeug.middleware.dispatcher import DispatcherMiddleware
+
+          app.wsgi_app = DispatcherMiddleware(app.wsgi_app, {
+              '/metrics': make_wsgi_app()
+          })
+
+          # Go - promhttp
+          import "github.com/prometheus/client_golang/prometheus/promhttp"
+
+          func main() {
+              http.Handle("/metrics", promhttp.Handler())
+              http.ListenAndServe(":8080", nil)
+          }
+
+          # Java - Spring Boot Actuator
+          # application.properties
+          management.endpoints.web.exposure.include=health,metrics,prometheus
+          management.metrics.export.prometheus.enabled=true
+
+          # Kubernetes ServiceMonitor
+          apiVersion: monitoring.coreos.com/v1
+          kind: ServiceMonitor
+          metadata:
+            name: myservice
+          spec:
+            selector:
+              matchLabels:
+                app: myservice
+            endpoints:
+            - port: http
+              path: /metrics
+              interval: 30s
+        references:
+          - "https://prometheus.io/docs/instrumenting/exporters/"
+
+    # ========================================
+    # 3. CENTRAL ERROR LOGGING
+    # ========================================
+    - id: central_logging
+      name: "Central Error Logging"
+      severity: warning
+      priority: 3
+      confidence: 87%
+      source: "Service Maturity Pattern #21"
+
+      detection:
+        - language: python
+          pattern: 'raise\s+\w+Error|return.*Exception'
+          exclude: 'log\.|logger\.|logging\.'
+          file_types: ["*.py"]
+          message: "Error raised/returned without logging"
+
+        - language: go
+          pattern: 'return\s+.*err|return\s+nil,\s*err'
+          exclude: 'log\.|logger\.|zap\.|logrus\.'
+          file_types: ["*.go"]
+          message: "Error returned without logging"
+
+        - language: java
+          pattern: 'throw new|throws\s+\w+Exception'
+          exclude: 'log\.|logger\.|LOG\.'
+          file_types: ["*.java"]
+          message: "Exception thrown without logging"
+
+      guidance:
+        description: "All errors must be centrally logged to SUMO Logic before being returned or raised"
+        impact: |
+          - Cannot debug production issues without logs in SUMO
+          - Missing context about failure scenarios
+          - Incomplete error tracking and metrics
+          - Increased MTTR (Mean Time To Resolution)
+          - Lost incident forensics data
+        fix: "Add structured logging for all error paths (automatically sent to SUMO Logic)"
+        example: |
+          # Python - structlog (sends to SUMO Logic)
+          import structlog
+          logger = structlog.get_logger()
+
+          try:
+              result = payment_gateway.charge(data)
+          except PaymentGatewayError as e:
+              logger.error(
+                  "payment_gateway_failure",
+                  error=str(e),
+                  payment_id=data.get('id'),
+                  amount=data.get('amount'),
+                  user_id=data.get('user_id')
+              )
+              raise
+
+          # Go - zap (sends to SUMO Logic)
+          import "go.uber.org/zap"
+
+          result, err := paymentGateway.Charge(ctx, data)
+          if err != nil {
+              logger.Error("payment gateway failure",
+                  zap.Error(err),
+                  zap.String("payment_id", data.ID),
+                  zap.Float64("amount", data.Amount),
+              )
+              return err
+          }
+
+          # Java - SLF4J with structured logging (sends to SUMO Logic)
+          try {
+              result = paymentGateway.charge(data);
+          } catch (PaymentGatewayException e) {
+              logger.error("Payment gateway failure: paymentId={}, amount={}, error={}",
+                  data.getId(), data.getAmount(), e.getMessage(), e);
+              throw e;
+          }
+        references:
+          - "https://www.structlog.org/"
+          - "https://github.com/uber-go/zap"
+
+    # ========================================
+    # 4. REQUEST DURATION TRACKING
+    # ========================================
+    - id: duration_metrics
+      name: "Request Duration Tracking"
+      severity: warning
+      priority: 4
+      confidence: 85%
+      source: "SLO tracking requirement"
+
+      detection:
+        - language: python
+          pattern: '@app\.route\('
+          exclude: 'Histogram|\.observe\(|\.time\(\)'
+          file_types: ["*.py"]
+          message: "HTTP endpoint without duration/latency metrics"
+
+        - language: go
+          pattern: 'func.*Handler\(.*http\.ResponseWriter'
+          exclude: 'Histogram|ObserveDuration|NewTimer'
+          file_types: ["*.go"]
+          message: "HTTP handler without duration tracking"
+
+        - language: java
+          pattern: '@(GetMapping|PostMapping)'
+          exclude: '@Timed|Timer\.record'
+          file_types: ["*.java"]
+          message: "REST endpoint without duration tracking"
+
+      guidance:
+        description: "All HTTP endpoints must track request duration for latency SLOs"
+        impact: |
+          - Cannot measure P50, P95, P99 latency
+          - Unable to detect performance regressions
+          - No SLO tracking for customer-facing endpoints
+          - Missing data for capacity planning
+        fix: "Add Prometheus Histogram to track request duration"
+        example: |
+          # Python - Histogram with decorator
+          from prometheus_client import Histogram
+
+          request_latency = Histogram(
+              'http_request_duration_seconds',
+              'HTTP request latency',
+              ['method', 'endpoint'],
+              buckets=(0.01, 0.05, 0.1, 0.5, 1.0, 2.5, 5.0, 10.0)
+          )
+
+          @app.route('/api/search')
+          @request_latency.labels(method='GET', endpoint='/api/search').time()
+          def search():
+              return jsonify(perform_search(request.args))
+
+          # Go - Histogram with timer
+          httpDuration := promauto.NewHistogramVec(
+              prometheus.HistogramOpts{
+                  Name: "http_request_duration_seconds",
+                  Help: "HTTP request latency",
+                  Buckets: prometheus.DefBuckets,
+              },
+              []string{"method", "endpoint"},
+          )
+
+          func searchHandler(w http.ResponseWriter, r *http.Request) {
+              timer := prometheus.NewTimer(httpDuration.WithLabelValues("GET", "/api/search"))
+              defer timer.ObserveDuration()
+
+              results := performSearch(r.URL.Query())
+              json.NewEncoder(w).Encode(results)
+          }
+
+          # Java - Micrometer Timer
+          @GetMapping("/api/search")
+          @Timed(value = "http.request.duration", percentiles = {0.5, 0.95, 0.99})
+          public List<Result> search(@RequestParam String query) {
+              return performSearch(query);
+          }
+        references:
+          - "https://prometheus.io/docs/practices/histograms/"
+
+    # ========================================
+    # 5. REQUEST ID PROPAGATION
+    # ========================================
+    - id: request_id_propagation
+      name: "Request ID Propagation"
+      severity: info
+      priority: 5
+      confidence: 80%
+      source: "Distributed tracing requirement"
+
+      detection:
+        - language: python
+          pattern: 'requests\.(get|post|put|delete)'
+          exclude: 'X-Request-ID|request_id|correlation_id|trace_id'
+          file_types: ["*.py"]
+          message: "External HTTP call without request ID propagation"
+
+        - language: go
+          pattern: 'http\.NewRequest'
+          exclude: 'X-Request-ID|requestID|correlation|trace'
+          file_types: ["*.go"]
+          message: "HTTP request without request ID header"
+
+        - language: java
+          pattern: 'RestTemplate|HttpClient'
+          exclude: 'X-Request-ID|requestId|MDC'
+          file_types: ["*.java"]
+          message: "HTTP client without request ID propagation"
+
+      guidance:
+        description: "Propagate request IDs across service boundaries for distributed tracing"
+        impact: |
+          - Cannot trace requests across microservices
+          - Difficult to correlate logs from different services
+          - Incomplete debugging for multi-service workflows
+          - Lost transaction context in distributed systems
+        fix: "Extract request ID from incoming requests and propagate to outgoing calls"
+        example: |
+          # Python - Flask middleware
+          import uuid
+          from flask import request, g
+
+          @app.before_request
+          def before_request():
+              g.request_id = request.headers.get('X-Request-ID', str(uuid.uuid4()))
+
+          def call_external_service(url, data):
+              headers = {
+                  'X-Request-ID': g.request_id,
+                  'Content-Type': 'application/json'
+              }
+              return requests.post(url, json=data, headers=headers, timeout=10)
+
+          # Go - middleware
+          func requestIDMiddleware(next http.Handler) http.Handler {
+              return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+                  requestID := r.Header.Get("X-Request-ID")
+                  if requestID == "" {
+                      requestID = uuid.New().String()
+                  }
+                  ctx := context.WithValue(r.Context(), "request_id", requestID)
+                  w.Header().Set("X-Request-ID", requestID)
+                  next.ServeHTTP(w, r.WithContext(ctx))
+              })
+          }
+
+          # Java - Spring Boot Interceptor
+          @Component
+          public class RequestIdInterceptor implements HandlerInterceptor {
+              @Override
+              public boolean preHandle(HttpServletRequest request,
+                                      HttpServletResponse response, Object handler) {
+                  String requestId = request.getHeader("X-Request-ID");
+                  if (requestId == null) {
+                      requestId = UUID.randomUUID().toString();
+                  }
+                  MDC.put("requestId", requestId);
+                  response.setHeader("X-Request-ID", requestId);
+                  return true;
+              }
+          }
+        references:
+          - "https://www.w3.org/TR/trace-context/"
+
+# ============================================================================
+# CATEGORY 4: NPI (New Product Introduction)
+# Purpose: Validate branch-based feature releases, new feature introduction
+# ============================================================================
+npi:
+  category_description: "Patterns to validate new features and changes before production release"
+  confidence_level: "High (82-99% across patterns)"
+  source_document: "SRE NPI Checklists - Design Sign-off"
+
+  patterns:
+    # ========================================
+    # 1. SQL INJECTION PREVENTION (MOST CRITICAL)
+    # ========================================
+    - id: sql_injection
+      name: "SQL Injection Prevention"
+      severity: critical
+      priority: 1
+      confidence: 99%
+      source: "OWASP Top 10 - Security vulnerability"
+
+      detection:
+        # Python - string formatting in SQL
+        - language: python
+          pattern: '(execute|executemany)\s*\([^)]*(%s|%d|\+|f"|f''|\.format)'
+          file_types: ["*.py"]
+          message: "Potential SQL injection - string concatenation in query"
+
+        # Go - string concatenation in SQL
+        - language: go
+          pattern: '(Query|Exec)\s*\([^)]*\+|fmt\.Sprintf.*SELECT|fmt\.Sprintf.*INSERT'
+          file_types: ["*.go"]
+          message: "Potential SQL injection - string concatenation in query"
+
+        # Java - string concatenation in SQL
+        - language: java
+          pattern: 'executeQuery\([^)]*\+|executeUpdate\([^)]*\+'
+          file_types: ["*.java"]
+          message: "Potential SQL injection - string concatenation in query"
+
+      guidance:
+        description: "Never use string concatenation for SQL queries - always use parameterized queries"
+        impact: |
+          - CRITICAL SECURITY VULNERABILITY - data breach risk
+          - Attackers can read, modify, or delete any data
+          - Potential for privilege escalation
+          - Compliance violations (PCI-DSS, SOC2, GDPR)
+          - Reputation damage and legal liability
+        fix: "Use parameterized queries with placeholders"
+        example: |
+          # Python
+          # ❌ DANGEROUS - SQL Injection risk
+          user_id = request.args.get('user_id')
+          query = f"SELECT * FROM users WHERE id = {user_id}"
+          cursor.execute(query)
+
+          # ✅ SAFE - Parameterized query
+          user_id = request.args.get('user_id')
+          query = "SELECT * FROM users WHERE id = %s"
+          cursor.execute(query, (user_id,))
+
+          # ✅ SAFE - ORM
+          user = User.query.filter_by(id=user_id).first()
+
+          # Go
+          // ❌ DANGEROUS
+          query := "SELECT * FROM users WHERE id = " + userID
+          rows, _ := db.Query(query)
+
+          // ✅ SAFE - Parameterized
+          query := "SELECT * FROM users WHERE id = $1"
+          rows, _ := db.Query(query, userID)
+
+          # Java
+          // ❌ DANGEROUS
+          String query = "SELECT * FROM users WHERE id = " + userId;
+          stmt.executeQuery(query);
+
+          // ✅ SAFE - PreparedStatement
+          String query = "SELECT * FROM users WHERE id = ?";
+          PreparedStatement stmt = conn.prepareStatement(query);
+          stmt.setInt(1, userId);
+          ResultSet rs = stmt.executeQuery();
+        references:
+          - "https://owasp.org/www-community/attacks/SQL_Injection"
+          - "https://cheatsheetseries.owasp.org/cheatsheets/SQL_Injection_Prevention_Cheat_Sheet.html"
+
+    # ========================================
+    # 2. FEATURE FLAG DETECTION
+    # ========================================
+    - id: feature_flag_detection
+      name: "Feature Flag for New Features"
+      severity: warning
+      priority: 2
+      confidence: 85%
+      source: "NPI CSV Row 54 - Safe rollout requirement"
+
+      detection:
+        # Python - new Flask routes without feature flag
+        - language: python
+          pattern: '@app\.route\(|@router\.(get|post|put|delete)'
+          exclude: 'feature_flag|FeatureFlag|flag_enabled|LaunchDarkly'
+          new_code_only: true
+          file_types: ["*.py"]
+          message: "New endpoint without feature flag protection"
+
+        # Go - new HTTP handlers without feature flag
+        - language: go
+          pattern: 'func.*Handler\(.*http\.ResponseWriter'
+          exclude: 'FeatureEnabled|featureFlag|unleash'
+          new_code_only: true
+          file_types: ["*.go"]
+          message: "New handler without feature flag check"
+
+        # Java - new REST endpoints without feature flag
+        - language: java
+          pattern: '@(GetMapping|PostMapping|PutMapping|DeleteMapping)'
+          exclude: 'FeatureFlag|@FeatureToggle|Togglz'
+          new_code_only: true
+          file_types: ["*.java"]
+          message: "New REST endpoint without feature flag"
+
+      guidance:
+        description: "New features must be protected with feature flags for safe rollout"
+        impact: |
+          - Cannot roll back without redeployment
+          - All-or-nothing deployment (no gradual rollout)
+          - No ability to disable feature in production emergency
+          - Cannot test in production with subset of users
+          - Difficult to isolate issues to specific feature
+          - Blast radius control impossible
+        fix: "Wrap new features in feature flags (LaunchDarkly, Unleash, Togglz)"
+        example: |
+          # Python - LaunchDarkly
+          from ldclient import get as ld_client
+
+          @app.route('/api/new-checkout', methods=['POST'])
+          def new_checkout():
+              user = get_current_user()
+
+              if not ld_client().variation('new-checkout-flow', user, False):
+                  return old_checkout()
+
+              return process_new_checkout(request.json)
+
+          # Go - Unleash
+          import "github.com/Unleash/unleash-client-go/v3"
+
+          func newCheckoutHandler(w http.ResponseWriter, r *http.Request) {
+              enabled := unleash.IsEnabled("new-checkout-flow")
+              if !enabled {
+                  oldCheckoutHandler(w, r)
+                  return
+              }
+              processNewCheckout(w, r)
+          }
+
+          # Java - Togglz
+          @PostMapping("/api/new-checkout")
+          public ResponseEntity<?> newCheckout(@RequestBody CheckoutRequest req) {
+              if (!MyFeatures.NEW_CHECKOUT_FLOW.isActive()) {
+                  return oldCheckout(req);
+              }
+              return processNewCheckout(req);
+          }
+
+          # Scala - FF4S
+          import io.laserdisc.ff4s._
+
+          def newCheckout: IO[Response] = {
+              client.boolVariation("new-checkout-flow", user, false).flatMap {
+                  case true => processNewCheckout
+                  case false => oldCheckout
+              }
+          }
+        references:
+          - "https://launchdarkly.com/blog/what-are-feature-flags/"
+          - "https://www.getunleash.io/"
+          - "https://www.togglz.org/"
+
+    # ========================================
+    # 3. DATABASE MIGRATIONS
+    # ========================================
+    - id: database_migrations
+      name: "Database Schema Changes with Migration"
+      severity: warning
+      priority: 3
+      confidence: 88%
+      source: "NPI CSV Row 26 - Data consistency"
+
+      detection:
+        # Python - model changes without migrations
+        - language: python
+          file_changed: "*/models.py|*/models/*.py"
+          require_corresponding_change: "*/migrations/*.py|*/alembic/versions/*.py"
+          message: "Database model changed without migration file"
+
+        # Go - model changes without migrations
+        - language: go
+          file_changed: "*/models/*.go|*/entities/*.go"
+          require_corresponding_change: "*/migrations/*.sql|*/migrate/*.sql"
+          message: "Database model changed without migration file"
+
+        # Java - entity changes without migrations
+        - language: java
+          file_changed: "*/entity/*.java|*/model/*.java"
+          require_corresponding_change: "*/db/migration/*.sql|*/resources/db/migration/*.sql"
+          message: "JPA entity changed without migration file"
+
+      guidance:
+        description: "All database schema changes must have corresponding migration files"
+        impact: |
+          - Schema drift between environments
+          - Deployment failures due to missing tables/columns
+          - Data inconsistency across instances
+          - Cannot rollback changes safely
+          - Manual database fixes required in production
+          - GDPR/data sovereignty compliance issues
+        fix: "Create migration file for every schema change"
+        example: |
+          # Python - Alembic
+          # Step 1: Modify model
+          class User(Base):
+              first_name = Column(String)  # NEW FIELD
+
+          # Step 2: Generate migration
+          alembic revision --autogenerate -m "Add first_name to users"
+
+          # Step 3: Review migration
+          def upgrade():
+              op.add_column('users', sa.Column('first_name', sa.String()))
+
+          def downgrade():
+              op.drop_column('users', 'first_name')
+
+          # Go - golang-migrate
+          migrate create -ext sql -dir db/migrations -seq add_first_name
+
+          # 000001_add_first_name.up.sql
+          ALTER TABLE users ADD COLUMN first_name VARCHAR(100);
+
+          # 000001_add_first_name.down.sql
+          ALTER TABLE users DROP COLUMN first_name;
+
+          # Java - Flyway
+          # V1__add_first_name.sql
+          ALTER TABLE users ADD COLUMN first_name VARCHAR(100);
+
+          # Safe migration (zero-downtime):
+          # Step 1: Add column (nullable)
+          ALTER TABLE users ADD COLUMN new_field VARCHAR(100);
+          # Step 2: Backfill data
+          UPDATE users SET new_field = old_field WHERE new_field IS NULL;
+          # Step 3: Make NOT NULL (separate migration)
+          ALTER TABLE users ALTER COLUMN new_field SET NOT NULL;
+        references:
+          - "https://alembic.sqlalchemy.org/"
+          - "https://github.com/golang-migrate/migrate"
+          - "https://flywaydb.org/"
+
+    # ========================================
+    # 4. API BREAKING CHANGES
+    # ========================================
+    - id: api_breaking_changes
+      name: "API Breaking Changes Detection"
+      severity: warning
+      priority: 4
+      confidence: 82%
+      source: "NPI CSV Row 33 - Backwards compatibility"
+
+      detection:
+        # Database schema breaking changes
+        - language: all
+          pattern: 'DROP\s+TABLE|DROP\s+COLUMN|RENAME\s+COLUMN'
+          file_types: ["*.sql", "*/migrations/*"]
+          message: "Database schema breaking change detected"
+
+        # API endpoint deletion
+        - language: python
+          pattern: '@app\.route.*DELETE|@router\.delete'
+          file_types: ["*.py"]
+          message: "API endpoint deletion detected - check backwards compatibility"
+
+        - language: java
+          pattern: '@DeleteMapping'
+          file_types: ["*.java"]
+          message: "REST endpoint deletion detected - check backwards compatibility"
+
+      guidance:
+        description: "API changes must maintain backwards compatibility or be versioned"
+        impact: |
+          - Breaks existing clients and integrations
+          - Customer applications fail immediately
+          - Mobile apps become unusable (cannot force update)
+          - Lost revenue and customer trust
+          - Emergency rollback required
+          - Upstream/downstream component failures
+        fix: "Use API versioning or deprecation strategy instead of breaking changes"
+        example: |
+          # ❌ BAD - Breaking change (removed field)
+          {
+              "user_id": 123,
+              "email": "user@example.com"
+              # "full_name" REMOVED - breaks clients
+          }
+
+          # ✅ GOOD - Deprecation (keep old field)
+          {
+              "user_id": 123,
+              "email": "user@example.com",
+              "full_name": "John Doe",      # Deprecated but present
+              "first_name": "John",
+              "last_name": "Doe"
+          }
+
+          # ✅ BETTER - API versioning
+          # /v1/users - old format (deprecated but functional)
+          # /v2/users - new format
+
+          # Python
+          @app.route('/v1/users/<int:user_id>')
+          def get_user_v1(user_id):
+              return jsonify({'full_name': f"{user.first_name} {user.last_name}"})
+
+          @app.route('/v2/users/<int:user_id>')
+          def get_user_v2(user_id):
+              return jsonify({'first_name': user.first_name, 'last_name': user.last_name})
+
+          # Database migrations - Add columns, never remove
+          # ❌ BAD
+          ALTER TABLE users DROP COLUMN full_name;
+
+          # ✅ GOOD - Add new, deprecate old
+          ALTER TABLE users ADD COLUMN first_name VARCHAR(100);
+          ALTER TABLE users ADD COLUMN last_name VARCHAR(100);
+          -- Keep full_name for backwards compatibility
+        references:
+          - "https://www.troyhunt.com/your-api-versioning-is-wrong-which-is/"
+          - "https://stripe.com/blog/api-versioning"
+
+    # ========================================
+    # 5. TEST COVERAGE FOR NEW CODE
+    # ========================================
+    - id: test_coverage
+      name: "Test Coverage for New Code"
+      severity: warning
+      priority: 5
+      confidence: 85%
+      source: "Code quality gate"
+
+      detection:
+        # Python - new code without tests
+        - language: python
+          new_files: "*.py"
+          exclude: "__init__.py|test_*.py|*_test.py"
+          require_corresponding: "test_*.py|*_test.py"
+          message: "New Python file without corresponding test file"
+
+        # Go - new code without tests
+        - language: go
+          new_files: "*.go"
+          exclude: "*_test.go"
+          require_corresponding: "*_test.go"
+          message: "New Go file without corresponding test file"
+
+        # Java - new code without tests
+        - language: java
+          new_files: "*/main/java/**/*.java"
+          require_corresponding: "*/test/java/**/*Test.java"
+          message: "New Java class without corresponding test class"
+
+      guidance:
+        description: "All new code must have corresponding unit tests"
+        impact: |
+          - No safety net for regressions
+          - Difficult to refactor safely
+          - Hidden bugs reach production
+          - Increased debugging time
+          - Lower code quality over time
+        fix: "Create test files for all new code with meaningful test coverage"
+        example: |
+          # Python - pytest
+          # File: app/services/payment.py
+          # Test: tests/services/test_payment.py
+
+          class TestPaymentService:
+              def test_process_payment_success(self):
+                  service = PaymentService()
+                  result = service.process_payment({'amount': 100})
+                  assert result['status'] == 'success'
+
+              def test_process_payment_invalid_amount(self):
+                  service = PaymentService()
+                  with pytest.raises(ValueError):
+                      service.process_payment({'amount': -100})
+
+          # Go
+          // File: services/payment.go
+          // Test: services/payment_test.go
+
+          func TestProcessPayment_Success(t *testing.T) {
+              service := NewPaymentService()
+              result, err := service.ProcessPayment(100)
+              if err != nil {
+                  t.Fatalf("expected no error, got %v", err)
+              }
+              assert.Equal(t, "success", result.Status)
+          }
+
+          # Java - JUnit
+          // File: com/example/service/PaymentService.java
+          // Test: com/example/service/PaymentServiceTest.java
+
+          @Test
+          public void testProcessPayment_Success() {
+              PaymentService service = new PaymentService();
+              PaymentResult result = service.processPayment(100);
+              assertEquals("success", result.getStatus());
+          }
+
+          @Test(expected = IllegalArgumentException.class)
+          public void testProcessPayment_InvalidAmount() {
+              PaymentService service = new PaymentService();
+              service.processPayment(-100);
+          }
+        references:
+          - "https://docs.pytest.org/"
+          - "https://go.dev/doc/tutorial/add-a-test"
+          - "https://junit.org/junit5/"

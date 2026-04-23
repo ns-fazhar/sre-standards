@@ -1,8 +1,9 @@
 #!/bin/bash
-# Auto-generated from sre_operability-patterns.yaml v3.0.0
+# Auto-generated from sre-top5-patterns.yaml v1.0.0
 # DO NOT EDIT MANUALLY - Regenerate with: make generate
 # Category: Operability
-# Patterns: 5 enabled
+# Patterns: Top 5 most critical
+# Languages: python, go, java, scala
 
 set -e
 
@@ -15,8 +16,9 @@ CYAN='\033[0;36m'
 BOLD='\033[1m'
 NC='\033[0m'
 
-echo -e "${BOLD}${BLUE}🔍 SRE Operability Check (v3.0.0)${NC}"
+echo -e "${BOLD}${BLUE}🔍 SRE Top 5: Operability (v1.0.0)${NC}"
 echo -e "${CYAN}Patterns to ensure services can be operated, debugged, and maintained${NC}"
+echo -e "${CYAN}Confidence: High (75-99% across patterns)${NC}"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 
@@ -25,13 +27,13 @@ WARNINGS=0
 INFO=0
 
 # ========================================
-# Pattern: No Hardcoded Secrets
-# ID: secrets_management
+# Pattern: No Hardcoded Secrets (99%% confidence)
+# ID: no_hardcoded_secrets
 # Severity: critical
 # ========================================
-echo -n "Checking No Hardcoded Secrets... "
+echo -n "[1/5] Checking No Hardcoded Secrets... "
 
-if grep -rq "(password|api_key|secret|token|aws_access_key)" . --include="*.py" --include="*.go" --include="*.js" --include="*.java" --include="*.yaml" --include="*.json" 2>/dev/null; then
+if grep -rq "(password|api_key|secret|token|aws_access_key|private_key)\s*=\s*['\"]([a-zA-Z0-9+/=]{20,})['\"]" . --include="*.py" --include="*.go" --include="*.js" --include="*.java" --include="*.scala" --include="*.yaml" --include="*.yml" 2>/dev/null; then
     echo -e "${GREEN}✓${NC}"
 else
     echo -e "${RED}✗${NC}"
@@ -42,14 +44,14 @@ else
 fi
 
 # ========================================
-# Pattern: Graceful Shutdown
-# ID: no_graceful_shutdown
+# Pattern: Graceful Shutdown (85%% confidence)
+# ID: graceful_shutdown
 # Severity: warning
 # ========================================
-echo -n "Checking Graceful Shutdown... "
+echo -n "[2/5] Checking Graceful Shutdown... "
 
 if grep -rq "func main\(\)" . --include="*.go" 2>/dev/null; then
-    # Check if exclude pattern also exists
+    # Check if exclude pattern also exists (good case)
     if grep -rq "signal\.Notify|syscall\.SIGTERM|syscall\.SIGINT" . --include="*.go" 2>/dev/null; then
         echo -e "${GREEN}✓${NC}"
     else
@@ -62,11 +64,11 @@ if grep -rq "func main\(\)" . --include="*.go" 2>/dev/null; then
 fi
 
 # ========================================
-# Pattern: Environment Variables Documented
-# ID: env_vars_undocumented
+# Pattern: Environment Variables Documented (75%% confidence)
+# ID: env_vars_documented
 # Severity: info
 # ========================================
-echo -n "Checking Environment Variables Documented... "
+echo -n "[3/5] Checking Environment Variables Documented... "
 
 if grep -rq "os\.getenv\(|os\.environ\[|os\.environ\.get\(" . --include="*.py" 2>/dev/null; then
     echo -e "${GREEN}✓${NC}"
@@ -79,15 +81,15 @@ else
 fi
 
 # ========================================
-# Pattern: Dockerfile Present
-# ID: missing_dockerfile
+# Pattern: Dockerfile Present (88%% confidence)
+# ID: dockerfile_present
 # Severity: warning
 # ========================================
-echo -n "Checking Dockerfile Present... "
+echo -n "[4/5] Checking Dockerfile Present... "
 
 if [ -f "Dockerfile" ]; then
-    echo -e "${RED}✗${NC}"
-    echo "  🔴 WARNING: Service must have Dockerfile for containerization and Kubernetes deployment"
+    echo -e "${YELLOW}⚠${NC}"
+    echo "  🟡 WARNING: Service must have Dockerfile for containerization and Kubernetes deployment"
     echo ""
     WARNINGS=$((WARNINGS + 1))
 else
@@ -95,14 +97,14 @@ else
 fi
 
 # ========================================
-# Pattern: Configuration Validation
-# ID: config_not_validated
+# Pattern: Configuration Validation (78%% confidence)
+# ID: config_validation
 # Severity: info
 # ========================================
-echo -n "Checking Configuration Validation... "
+echo -n "[5/5] Checking Configuration Validation... "
 
 if grep -rq "yaml\.load\(|json\.load\(|configparser\." . --include="*.py" 2>/dev/null; then
-    # Check if exclude pattern also exists
+    # Check if exclude pattern also exists (good case)
     if grep -rq "validate|schema|pydantic|marshmallow" . --include="*.py" 2>/dev/null; then
         echo -e "${GREEN}✓${NC}"
     else
@@ -120,7 +122,7 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo ""
 
 if [ $CRITICAL -eq 0 ] && [ $WARNINGS -eq 0 ] && [ $INFO -eq 0 ]; then
-    echo -e "${GREEN}${BOLD}✅ ALL CHECKS PASSED!${NC}"
+    echo -e "${GREEN}${BOLD}✅ ALL TOP 5 CHECKS PASSED!${NC}"
     echo ""
     exit 0
 elif [ $CRITICAL -eq 0 ] && [ $WARNINGS -eq 0 ]; then
@@ -136,9 +138,9 @@ elif [ $CRITICAL -eq 0 ]; then
     echo "💡 Consider addressing warnings before production."
     exit 0
 else
-    echo -e "${RED}${BOLD}❌ CHECKS FAILED${NC}"
+    echo -e "${RED}${BOLD}❌ CRITICAL ISSUES FOUND${NC}"
     echo ""
-    echo "Found $CRITICAL critical issue(s), $WARNINGS warning(s), and $INFO info item(s)."
+    echo "Found $CRITICAL critical/blocking issue(s), $WARNINGS warning(s), and $INFO info item(s)."
     echo ""
     echo "🔴 Critical issues must be fixed before production deployment."
     exit 1

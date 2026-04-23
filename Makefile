@@ -2,14 +2,13 @@
 
 all: generate
 
-# Generate scripts and skills from check-patterns.yaml
+# Generate scripts and skills from pattern YAML files
 generate:
-	@echo "🔄 Generating from check-patterns.yaml..."
-	@python3 generators/generate-scripts.py
+	@echo "🔄 Generating from pattern YAML files..."
+	@python3 generators/generate-all-patterns.py
 	@echo ""
-	@echo "✅ Generation complete!"
-	@echo "   📝 Updated: skills/operability-check.md"
-	@echo "   🔧 Updated: generated/check-operability.sh"
+	@echo "🔄 Generating Top 5 patterns..."
+	@python3 generators/generate-top5-patterns.py
 
 # Validate YAML syntax
 validate:

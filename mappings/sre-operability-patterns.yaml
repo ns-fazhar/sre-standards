@@ -1,0 +1,467 @@
+# SRE Operability Patterns
+# Owner: SRE Team
+# Auto-generates skills and scripts via: make generate
+
+metadata:
+  version: "3.0.0"
+  category: "sre_operability"
+  last_updated: "2026-04-15"
+  maintainer: "sre-team@company.com"
+  description: "Patterns to ensure services can be operated, debugged, and maintained"
+
+patterns:
+  # ========================================
+  # 1. SECRETS MANAGEMENT
+  # ========================================
+  - id: secrets_management
+    name: "No Hardcoded Secrets"
+    severity: critical
+    priority: 1
+    source: "Security compliance requirement"
+
+    detection:
+      # High-entropy strings that look like secrets
+      - language: all
+        pattern: "(password|api_key|secret|token|aws_access_key)"
+        file_types: ["*.py", "*.go", "*.js", "*.java", "*.yaml", "*.json"]
+        message: "Potential hardcoded secret detected"
+
+      # Common secret patterns
+      - language: all
+        pattern: "sk_live_|pk_live_|ghp_|gho_|AKIA"
+        file_types: ["*.py", "*.go", "*.js", "*.java"]
+        message: "API key pattern detected (Stripe, GitHub, AWS)"
+
+    guidance:
+      description: "Never hardcode secrets, passwords, or API keys in source code"
+      impact: |
+        - CRITICAL SECURITY RISK - credentials exposed in git history
+        - Potential data breach if code is leaked
+        - Compliance violations (PCI-DSS, SOC2, GDPR)
+        - Credential rotation requires code changes and deployment
+        - Cannot use different secrets for dev/staging/prod
+      fix: "Use environment variables or secret management systems (Vault, AWS Secrets Manager)"
+      example: |
+        # ❌ BAD - Hardcoded secrets
+        API_KEY = "sk_live_abc123xyz789"
+        DB_PASSWORD = "MyP@ssw0rd123"
+        AWS_SECRET = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+
+        # ✅ GOOD - Environment variables
+        import os
+
+        API_KEY = os.getenv('STRIPE_API_KEY')
+        DB_PASSWORD = os.getenv('DB_PASSWORD')
+        AWS_SECRET = os.getenv('AWS_SECRET_ACCESS_KEY')
+
+        if not API_KEY:
+            raise ValueError("STRIPE_API_KEY environment variable not set")
+
+        # ✅ BETTER - Secrets manager
+        import boto3
+
+        def get_secret(secret_name):
+            client = boto3.client('secretsmanager')
+            response = client.get_secret_value(SecretId=secret_name)
+            return json.loads(response['SecretString'])
+
+        secrets = get_secret('prod/myservice/credentials')
+        API_KEY = secrets['stripe_api_key']
+        DB_PASSWORD = secrets['db_password']
+
+        # Go - Environment variables
+        apiKey := os.Getenv("STRIPE_API_KEY")
+        if apiKey == "" {
+            log.Fatal("STRIPE_API_KEY environment variable not set")
+        }
+      references:
+        - "https://12factor.net/config"
+        - "https://docs.aws.amazon.com/secretsmanager/"
+
+  # ========================================
+  # 2. GRACEFUL SHUTDOWN
+  # ========================================
+  - id: no_graceful_shutdown
+    name: "Graceful Shutdown"
+    severity: warning
+    priority: 2
+    source: "NPI Row 55 - Operational concerns"
+
+    detection:
+      # Go - Check for signal handling
+      - language: go
+        pattern: 'func main\(\)'
+        exclude: 'signal\.Notify|syscall\.SIGTERM|syscall\.SIGINT'
+        file_types: ["*.go"]
+        message: "No graceful shutdown signal handling found"
+
+      # Python - Check for signal handling
+      - language: python
+        pattern: 'if __name__.*==.*__main__'
+        exclude: 'signal\.|SIGTERM|SIGINT'
+        file_types: ["*.py"]
+        message: "No graceful shutdown signal handling found"
+
+    guidance:
+      description: "Service must handle SIGTERM gracefully to avoid dropping in-flight requests"
+      impact: |
+        - In-flight requests dropped during deployment
+        - Database transactions incomplete
+        - WebSocket connections abruptly closed
+        - Poor user experience during rolling updates
+        - Failed requests during pod termination
+      fix: "Implement signal handlers to gracefully drain connections before shutdown"
+      example: |
+        # Python - Flask with graceful shutdown
+        import signal
+        import sys
+
+        class GracefulShutdown:
+            def __init__(self):
+                self.shutdown_requested = False
+                signal.signal(signal.SIGTERM, self.request_shutdown)
+                signal.signal(signal.SIGINT, self.request_shutdown)
+
+            def request_shutdown(self, signum, frame):
+                logger.info("Shutdown signal received, draining connections...")
+                self.shutdown_requested = True
+
+        shutdown_handler = GracefulShutdown()
+
+        def run_server():
+            app.run(host='0.0.0.0', port=8080)
+
+        # Go - HTTP server with graceful shutdown
+        package main
+
+        import (
+            "context"
+            "log"
+            "net/http"
+            "os"
+            "os/signal"
+            "syscall"
+            "time"
+        )
+
+        func main() {
+            server := &http.Server{
+                Addr:    ":8080",
+                Handler: router,
+            }
+
+            // Start server in goroutine
+            go func() {
+                if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+                    log.Fatalf("Server failed: %v", err)
+                }
+            }()
+
+            // Wait for interrupt signal
+            quit := make(chan os.Signal, 1)
+            signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+            <-quit
+
+            log.Println("Shutting down server gracefully...")
+
+            // Give in-flight requests 30 seconds to complete
+            ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+            defer cancel()
+
+            if err := server.Shutdown(ctx); err != nil {
+                log.Fatal("Server forced to shutdown:", err)
+            }
+
+            log.Println("Server exited")
+        }
+
+        # Kubernetes - configure terminationGracePeriodSeconds
+        apiVersion: apps/v1
+        kind: Deployment
+        spec:
+          template:
+            spec:
+              terminationGracePeriodSeconds: 30  # Match shutdown timeout
+              containers:
+              - name: myservice
+                lifecycle:
+                  preStop:
+                    exec:
+                      command: ["/bin/sh", "-c", "sleep 5"]  # Allow load balancer to deregister
+      references:
+        - "https://cloud.google.com/blog/products/containers-kubernetes/kubernetes-best-practices-terminating-with-grace"
+
+  # ========================================
+  # 3. ENV VARS UNDOCUMENTED
+  # ========================================
+  - id: env_vars_undocumented
+    name: "Environment Variables Documented"
+    severity: info
+    priority: 3
+    source: "Onboarding and operational clarity"
+
+    detection:
+      # Find env var usage
+      - language: python
+        pattern: 'os\.getenv\(|os\.environ\[|os\.environ\.get\('
+        file_types: ["*.py"]
+        then_check:
+          file_exists: [".env.example", ".env.template", "README.md"]
+        message: "Environment variables used but no .env.example found"
+
+      - language: go
+        pattern: 'os\.Getenv\('
+        file_types: ["*.go"]
+        then_check:
+          file_exists: [".env.example", ".env.template", "README.md"]
+        message: "Environment variables used but no .env.example found"
+
+    guidance:
+      description: "All environment variables must be documented in .env.example or README"
+      impact: |
+        - New developers cannot run the service locally
+        - Missing configuration causes runtime errors
+        - Difficult onboarding experience
+        - Deployment failures in new environments
+        - Unclear configuration requirements
+      fix: "Create .env.example with all required environment variables and descriptions"
+      example: |
+        # .env.example
+        # Copy this to .env and fill in actual values
+
+        # Database Configuration
+        DB_HOST=localhost
+        DB_PORT=5432
+        DB_NAME=myservice
+        DB_USER=postgres
+        DB_PASSWORD=changeme
+
+        # External APIs
+        STRIPE_API_KEY=sk_test_...
+        SENDGRID_API_KEY=SG....
+
+        # Service Configuration
+        PORT=8080
+        LOG_LEVEL=info
+        ENVIRONMENT=development
+
+        # Optional - defaults provided if not set
+        REDIS_URL=redis://localhost:6379
+        MAX_WORKERS=4
+
+        # README.md
+        ## Configuration
+
+        Copy `.env.example` to `.env` and configure:
+
+        | Variable | Required | Default | Description |
+        |----------|----------|---------|-------------|
+        | `DB_HOST` | Yes | - | PostgreSQL host |
+        | `DB_PASSWORD` | Yes | - | Database password |
+        | `STRIPE_API_KEY` | Yes | - | Stripe API key (get from dashboard) |
+        | `PORT` | No | 8080 | HTTP server port |
+        | `LOG_LEVEL` | No | info | Logging level (debug/info/warn/error) |
+      references:
+        - "https://12factor.net/config"
+
+  # ========================================
+  # 4. MISSING DOCKERFILE
+  # ========================================
+  - id: missing_dockerfile
+    name: "Dockerfile Present"
+    severity: warning
+    priority: 4
+    source: "Containerization standard"
+
+    detection:
+      - language: all
+        file_exists: "Dockerfile"
+        invert: true
+        message: "No Dockerfile found"
+
+    guidance:
+      description: "Service must have Dockerfile for containerization and Kubernetes deployment"
+      impact: |
+        - Cannot deploy to Kubernetes
+        - Inconsistent runtime environments
+        - Manual deployment process required
+        - Cannot use CI/CD pipelines
+        - Dev/prod parity issues
+      fix: "Create Dockerfile with best practices (multi-stage, non-root user, security)"
+      example: |
+        # Python - Multi-stage Dockerfile
+        # Build stage
+        FROM python:3.11-slim as builder
+
+        WORKDIR /app
+
+        # Install dependencies
+        COPY requirements.txt .
+        RUN pip install --user --no-cache-dir -r requirements.txt
+
+        # Runtime stage
+        FROM python:3.11-slim
+
+        # Create non-root user
+        RUN useradd -m -u 1000 appuser
+
+        WORKDIR /app
+
+        # Copy installed dependencies from builder
+        COPY --from=builder /root/.local /home/appuser/.local
+
+        # Copy application code
+        COPY --chown=appuser:appuser . .
+
+        # Switch to non-root user
+        USER appuser
+
+        # Update PATH
+        ENV PATH=/home/appuser/.local/bin:$PATH
+
+        EXPOSE 8080
+
+        # Health check
+        HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+          CMD python -c "import requests; requests.get('http://localhost:8080/health')"
+
+        CMD ["python", "app.py"]
+
+        # Go - Multi-stage Dockerfile
+        # Build stage
+        FROM golang:1.21 as builder
+
+        WORKDIR /app
+
+        # Copy go mod files
+        COPY go.mod go.sum ./
+        RUN go mod download
+
+        # Copy source
+        COPY . .
+
+        # Build binary
+        RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o main .
+
+        # Runtime stage
+        FROM alpine:latest
+
+        # Install ca-certificates for HTTPS
+        RUN apk --no-cache add ca-certificates
+
+        WORKDIR /root/
+
+        # Copy binary from builder
+        COPY --from=builder /app/main .
+
+        EXPOSE 8080
+
+        # Health check
+        HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+          CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
+
+        CMD ["./main"]
+      references:
+        - "https://docs.docker.com/develop/develop-images/dockerfile_best-practices/"
+
+  # ========================================
+  # 5. CONFIG NOT VALIDATED
+  # ========================================
+  - id: config_not_validated
+    name: "Configuration Validation"
+    severity: info
+    priority: 5
+    source: "Runtime error prevention"
+
+    detection:
+      # Check if config is loaded but not validated
+      - language: python
+        pattern: 'yaml\.load\(|json\.load\(|configparser\.'
+        exclude: 'validate|schema|pydantic|marshmallow'
+        file_types: ["*.py"]
+        message: "Configuration loaded without validation"
+
+      - language: go
+        pattern: 'yaml\.Unmarshal|json\.Unmarshal'
+        exclude: 'validate|Validate\(\)|validator'
+        file_types: ["*.go"]
+        message: "Configuration unmarshaled without validation"
+
+    guidance:
+      description: "Validate configuration at startup to fail fast on invalid config"
+      impact: |
+        - Runtime errors from invalid configuration
+        - Service starts but fails during operation
+        - Difficult to debug config issues
+        - Delayed error detection (after deployment)
+        - Unclear configuration requirements
+      fix: "Add validation schema and validate config at startup"
+      example: |
+        # Python - Pydantic for validation
+        from pydantic import BaseSettings, Field, validator
+
+        class Config(BaseSettings):
+            # Database
+            db_host: str
+            db_port: int = Field(ge=1, le=65535)
+            db_name: str
+
+            # API Keys (validated format)
+            stripe_api_key: str = Field(regex=r'^sk_(test|live)_[A-Za-z0-9]+$')
+
+            # Timeout (must be positive)
+            request_timeout: int = Field(default=30, ge=1, le=300)
+
+            @validator('db_host')
+            def validate_db_host(cls, v):
+                if not v:
+                    raise ValueError('db_host cannot be empty')
+                return v
+
+            class Config:
+                env_file = '.env'
+
+        # Load and validate
+        try:
+            config = Config()
+            print(f"✅ Configuration valid: {config}")
+        except Exception as e:
+            print(f"❌ Configuration error: {e}")
+            sys.exit(1)
+
+        # Go - go-playground/validator
+        import "github.com/go-playground/validator/v10"
+
+        type Config struct {
+            DBHost          string `validate:"required,hostname"`
+            DBPort          int    `validate:"required,min=1,max=65535"`
+            DBName          string `validate:"required"`
+            StripeAPIKey    string `validate:"required,startswith=sk_"`
+            RequestTimeout  int    `validate:"min=1,max=300"`
+        }
+
+        func LoadConfig() (*Config, error) {
+            config := &Config{}
+
+            // Load from env/file
+            // ... load logic ...
+
+            // Validate
+            validate := validator.New()
+            if err := validate.Struct(config); err != nil {
+                return nil, fmt.Errorf("config validation failed: %w", err)
+            }
+
+            return config, nil
+        }
+
+        func main() {
+            config, err := LoadConfig()
+            if err != nil {
+                log.Fatalf("Configuration error: %v", err)
+            }
+            log.Printf("✅ Configuration loaded successfully")
+        }
+      references:
+        - "https://pydantic-docs.helpmanual.io/"
+        - "https://github.com/go-playground/validator"
