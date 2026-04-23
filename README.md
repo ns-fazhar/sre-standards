@@ -1,104 +1,58 @@
 # SRE Standards - Central Control Repository
 
-**Version**: 4.0.0 (Top 5 Patterns)
-**Owner**: SRE Team
-**Purpose**: Single source of truth for SRE checks, skills, and standards
+**Version**: 4.0.0  
+**Owner**: SRE Team  
+**Purpose**: Single source of truth for SRE standards - Update once, distribute everywhere
 
-## 🎯 Overview
+---
 
-This repository contains:
-- **Check patterns** (YAML) - Single source of truth
-- **Generated scripts** - Auto-generated shell scripts for CI/CD
-- **Skills** - Claude AI instructions for interactive development
-- **Reusable workflows** - GitHub Actions that services can use
+## 🎯 What Is This?
 
-## 📁 Structure
+**SRE Standards** is a **centralized control repository** that defines, generates, and distributes SRE checks to all services across the organization. 
+
+Think of it as a **broadcast tower** 📡:
+- SRE Team updates standards **once** in this repo
+- All service repos automatically get updates via `@main` references
+- **Zero file copying, zero drift, zero maintenance for developers**
+
+### Key Innovation: Zero-Sync Distribution
 
 ```
-sre-standards/
-├── mappings/
-│   └── check-patterns.yaml          ← EDIT THIS to add/modify checks
-├── generated/
-│   └── check-operability.sh         ← Auto-generated, don't edit
-├── skills/
-│   └── operability-check.md         ← Auto-generated, don't edit
-├── .github/workflows/
-│   └── sre-checks-reusable.yml      ← Used by service repos
-├── generators/
-│   └── generate-scripts.py          ← Generator tool
-├── Makefile                         ← Your main commands
-└── VERSION                          ← Current version
+┌─────────────────────────────────────────────────────────────┐
+│                    sre-standards (Central)                  │
+│  ┌──────────────────────────────────────────────────────┐  │
+│  │  1 YAML file → Auto-generates:                       │  │
+│  │     • Shell scripts for CI/CD                        │  │
+│  │     • GitHub Actions workflows                       │  │
+│  │     • Claude AI skills                               │  │
+│  └──────────────────────────────────────────────────────┘  │
+└─────────────────────────────┬───────────────────────────────┘
+                              │
+                              │ Referenced via @main
+                              │
+        ┌─────────────────────┼─────────────────────┐
+        ↓                     ↓                     ↓
+  ┌──────────┐          ┌──────────┐          ┌──────────┐
+  │ Service  │          │ Service  │          │ Service  │
+  │    A     │          │    B     │          │    C     │
+  └──────────┘          └──────────┘          └──────────┘
+  1 workflow file       1 workflow file       1 workflow file
+  (never changes)       (never changes)       (never changes)
 ```
 
-## 🔧 For SRE Team: How to Update Checks
+**No manual sync required** - services always pull latest checks from central repo.
 
-### 1. Edit the Source of Truth
+---
 
-```bash
-vim mappings/check-patterns.yaml
+## 📊 For Service Owners (Developers)
 
-# Add a new check:
-- id: rate-limiting
-  name: "Rate Limiting"
-  category: reliability
-  severity: blocking
-  automation:
-    pattern: "rate_limit|RateLimiter"
-    file_types: ["*.py", "*.go"]
-  guidance:
-    description: "Prevent DoS attacks with rate limiting"
-    fix: "Add rate limiting middleware"
-    example: |
-      from flask_limiter import Limiter
-      limiter = Limiter(app, default_limits=["100 per hour"])
-```
+### Quick Start: 3 Steps to Enable SRE Checks
 
-### 2. Generate Scripts and Skills
+#### Step 1: Add ONE Workflow File
 
-```bash
-make generate
-
-# Output:
-# ✅ Generated generated/check-operability.sh
-# ✅ Generated skills/operability-check.md
-```
-
-### 3. Test
-
-```bash
-make test
-
-# Or test manually:
-cd ../some-service
-../sre-standards/generated/check-operability.sh
-```
-
-### 4. Commit and Push
-
-```bash
-git add .
-git commit -m "Add rate limiting check"
-git push
-
-# All services using this repo will automatically get the update!
-```
-
-## 📊 For Engineering Teams: How to Use
-
-### Option 1: GitHub Actions (Recommended)
-
-Copy the template to your service repo:
-
-```bash
-# Copy template to your service
-curl -o .github/workflows/sre-checks.yml \
-  https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/templates/service-sre-checks.yml
-```
-
-Or create manually:
+Create `.github/workflows/sre-checks.yml` in your service repo:
 
 ```yaml
-# .github/workflows/sre-checks.yml
 name: SRE Checks
 
 on:
@@ -112,203 +66,349 @@ jobs:
       pull-requests: write
     uses: ns-fazhar/sre-standards/.github/workflows/sre-standard-checks.yml@main
     with:
-      fail_on_issues: false  # Set true to block PRs with issues
+      fail_on_issues: false  # Set true to block PRs with critical issues
 ```
 
-**That's it!** Your PRs will automatically get:
-- ✅ SRE Checks (Reliability & Resilience) - All PRs
-- ✅ Operability Checks - All PRs  
-- ✅ Observability Checks - All PRs
+**That's it!** This file never needs updating - it references central repo `@main`.
 
-**NPI checks** run on-demand via workflow_dispatch (GitHub Actions UI)
+#### Step 2: Add NPI Workflow (Optional - For Feature Validation)
 
-### Option 2: Local Development with Claude
-
-```bash
-# One-time install
-curl -fsSL https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/install.sh | bash
-
-# Use in your service
-cd my-service
-claude code
-> /operability-check
-
-# Update to latest
-sre-sync
-```
-
-### Option 3: Makefile Integration
-
-```makefile
-# your-service/Makefile
-sre-check:
-	@curl -fsSL https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/generated/check-operability.sh | bash
-
-# Or if you have local copy:
-sre-check-local:
-	@../sre-standards/generated/check-operability.sh
-```
-
-## 📈 Current Checks (v2.1.0)
-
-### Observability
-- ✅ Readiness endpoint (`/ready`)
-- ✅ Health endpoint (`/health`)
-- ⚠️ Metrics endpoint (`/metrics`)
-- ⚠️ Structured logging (JSON)
-
-### Reliability
-- ✅ HTTP timeouts on all calls
-- ✅ Circuit breaker pattern
-- ⚠️ Error handling
-
-### Deployment
-- ⚠️ Dockerfile
-- ⚠️ Kubernetes manifests
-
-### Security
-- ⚠️ Dependency management
-- ✅ No hardcoded secrets
-
-### Documentation
-- ⚠️ README
-- ✅ Runbook
-
-Legend: ✅ = Blocking | ⚠️ = Warning
-
-## 🎯 Execution Model - 3 Automatic + 1 On-Demand
-
-### Automatic on ALL PRs (3 checks)
-Run on **every PR** - scan **entire codebase**
-
-1. **🔧 SRE Checks (Reliability)**: HTTP timeouts, circuit breakers, resource leaks
-2. **⚙️ Operability**: No secrets, graceful shutdown, Dockerfile
-3. **📊 Observability**: Prometheus metrics, SUMO logging
-
-### On-Demand Manual Run (1 check)
-Run **manually** via workflow_dispatch - scan **changed files only**
-
-4. **🚀 NPI (New Product Introduction)**: SQL injection, feature flags, migrations, breaking changes, tests
-
-| Check | When | Target | How to Run |
-|-------|------|--------|------------|
-| SRE Checks | All PRs (auto) | Entire codebase | Automatic |
-| Operability | All PRs (auto) | Entire codebase | Automatic |
-| Observability | All PRs (auto) | Entire codebase | Automatic |
-| NPI | On-demand | Changed files | GitHub Actions UI → "Run workflow" |
-
-## 🔄 How It Works
-
-```
-┌─────────────────────────────────────────────────┐
-│ 1. SRE updates check-patterns.yaml             │
-│    (Add new check, change severity, etc.)      │
-└────────────────┬────────────────────────────────┘
-                 │
-                 ↓
-┌─────────────────────────────────────────────────┐
-│ 2. Run: make generate                          │
-│    → Generates shell scripts                   │
-│    → Generates Claude skills                   │
-└────────────────┬────────────────────────────────┘
-                 │
-                 ↓
-┌─────────────────────────────────────────────────┐
-│ 3. Commit and push                             │
-└────────────────┬────────────────────────────────┘
-                 │
-        ┌────────┴────────┐
-        ↓                 ↓
-┌──────────────┐  ┌──────────────┐
-│ GitHub       │  │ Developers   │
-│ Actions      │  │ run          │
-│ (automatic)  │  │ sre-sync     │
-└──────────────┘  └──────────────┘
-```
-
-## 🎓 Examples
-
-### Adding a New Check
+Create `.github/workflows/npi-checks.yml`:
 
 ```yaml
-# mappings/check-patterns.yaml
-checks:
-  - id: my-new-check
-    name: "My New Check"
-    category: reliability
-    severity: blocking
+name: NPI Checks (On-Demand)
 
-    automation:
-      pattern: "my_pattern"
-      file_types: ["*.py"]
+on:
+  workflow_dispatch:
+    inputs:
+      base_branch:
+        description: 'Base branch to compare against'
+        default: 'main'
+        type: string
 
-    guidance:
-      description: "What this check does"
-      impact: "Why it matters"
-      fix: "How to fix it"
-      example: "Code example"
+jobs:
+  npi-validation:
+    permissions:
+      contents: read
+      pull-requests: write
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Fetch base branch
+        run: |
+          git fetch origin "${{ inputs.base_branch }}:${{ inputs.base_branch }}"
+      - uses: actions/checkout@v4
+        with:
+          repository: ns-fazhar/sre-standards
+          path: .sre-standards
+          ref: main
+      - name: Run NPI checks
+        run: .sre-standards/generated/check-npi-top5.sh
 ```
 
+#### Step 3: Commit and Push
+
 ```bash
-make generate
-make test
-git commit -am "Add my new check"
+git add .github/workflows/
+git commit -m "Add SRE standard checks"
 git push
 ```
 
-### Changing Severity
+### What You Get Automatically
+
+On **every PR**, GitHub Actions runs **3 checks in parallel**:
+
+1. **🔧 SRE Checks (Reliability & Resilience)**
+   - HTTP timeouts, circuit breakers, resource leaks, retries, health endpoints
+
+2. **⚙️ Operability**
+   - No hardcoded secrets, graceful shutdown, Dockerfile, config validation
+
+3. **📊 Observability**  
+   - Prometheus metrics, SUMO logging, request tracking, metrics endpoint
+
+**Results**: ONE consolidated PR comment with summary + collapsible details per check.
+
+### On-Demand Feature Validation
+
+For **new features** on feature branches, run **NPI checks** manually:
+
+4. **🚀 NPI (New Product Introduction)**
+   - SQL injection prevention, feature flags, migrations, breaking changes, test coverage
+   - Run via: GitHub Actions UI → "NPI Checks (On-Demand)" → Select feature branch
+
+---
+
+## 🛠️ For SRE Team: How to Control Standards
+
+### Repository Structure
+
+```
+sre-standards/
+├── mappings/
+│   └── sre-top5-patterns.yaml       ← SINGLE SOURCE OF TRUTH
+├── generated/                       ← Auto-generated (don't edit)
+│   ├── check-sre-top5.sh
+│   ├── check-operability-top5.sh
+│   ├── check-observability-top5.sh
+│   └── check-npi-top5.sh
+├── skills/                          ← Auto-generated (don't edit)
+│   ├── sre-checks-top5.md
+│   ├── operability-top5.md
+│   ├── observability-top5.md
+│   └── npi-top5.md
+├── .github/workflows/               ← Reusable workflows
+│   ├── sre-standard-checks.yml      ← Services reference this @main
+│   └── npi-checks-manual.yml        ← Template for services
+├── generators/
+│   └── generate-top5-patterns.py    ← Generator script
+└── VERSION                          ← Current version
+```
+
+### How to Update Standards (4 Steps)
+
+#### 1. Edit the Pattern File
+
+```bash
+cd sre-standards
+vim mappings/sre-top5-patterns.yaml
+```
+
+Add or modify a check:
 
 ```yaml
-# Change from warning to blocking
-- id: metrics-endpoint
-  severity: blocking  # was: warning
+sre_checks:
+  patterns:
+    - id: rate-limiting
+      name: "Rate Limiting"
+      severity: blocking
+      confidence: high
+      
+      automation:
+        pattern: 'rate_limit|RateLimiter|@ratelimit'
+        languages:
+          python: 'flask_limiter|ratelimit'
+          go: 'golang.org/x/time/rate'
+          java: 'RateLimiter|Bucket4j'
+      
+      guidance:
+        description: "Prevent DoS attacks with rate limiting"
+        impact: "Without rate limiting, services are vulnerable to abuse"
+        fix: "Add rate limiting middleware to all public endpoints"
+        example: |
+          # Python (Flask)
+          from flask_limiter import Limiter
+          limiter = Limiter(app, default_limits=["100/hour"])
 ```
+
+#### 2. Generate Scripts and Skills
 
 ```bash
 make generate
-git commit -am "Escalate metrics check to blocking"
+```
+
+Output:
+```
+✅ Generated generated/check-sre-top5.sh
+✅ Generated generated/check-operability-top5.sh
+✅ Generated generated/check-observability-top5.sh
+✅ Generated generated/check-npi-top5.sh
+✅ Generated skills/sre-checks-top5.md
+✅ Generated skills/operability-top5.md
+✅ Generated skills/observability-top5.md
+✅ Generated skills/npi-top5.md
+```
+
+#### 3. Test Locally
+
+```bash
+# Test against sample service
+cd ../payment-service
+make sre-check-all
+```
+
+#### 4. Commit and Push
+
+```bash
+git add mappings/ generated/ skills/
+git commit -m "Add rate limiting check to SRE standards"
 git push
 ```
 
-### Updating Check Logic
+**🎉 Done!** All services automatically get the new check on their next PR.
 
-```yaml
-# Update pattern
-- id: http-timeouts
-  automation:
-    pattern: "timeout=|Timeout:"  # Added Timeout: for Go
+### Why This Works
+
+- Services reference `sre-standards/.github/workflows/sre-standard-checks.yml@main`
+- The workflow always pulls latest scripts from `@main`
+- No need to update 50+ service repos individually
+- Changes propagate instantly
+
+---
+
+## 📋 Current Checks (v4.0.0)
+
+### 🔧 SRE Checks (Reliability & Resilience) - 5 Patterns
+| Pattern | Severity | Languages |
+|---------|----------|-----------|
+| HTTP Timeout Protection | ✅ Blocking | Python, Go, Java, Scala |
+| Circuit Breaker | ✅ Blocking | Python, Go, Java, Scala |
+| Resource Leak Prevention | ⚠️ Warning | Python, Go, Java |
+| Retry with Exponential Backoff | ⚠️ Warning | Python, Go, Java, Scala |
+| Health & Readiness Endpoints | ✅ Blocking | All |
+
+### ⚙️ Operability - 5 Patterns
+| Pattern | Severity | Languages |
+|---------|----------|-----------|
+| No Hardcoded Secrets | 🔴 Critical | All |
+| Graceful Shutdown | ✅ Blocking | Python, Go, Java |
+| Environment Variables Documented | ℹ️ Info | All |
+| Dockerfile Present | ✅ Blocking | All |
+| Configuration Validation | ⚠️ Warning | Python, Go, Java |
+
+### 📊 Observability - 5 Patterns
+| Pattern | Severity | Stack |
+|---------|----------|-------|
+| Prometheus Metrics Instrumentation | ✅ Blocking | Prometheus |
+| Metrics Endpoint | ⚠️ Warning | Prometheus |
+| Central Error Logging | ✅ Blocking | SUMO Logic |
+| Request Duration Tracking | ⚠️ Warning | Prometheus |
+| Request ID Propagation | ⚠️ Warning | All |
+
+### 🚀 NPI (New Product Introduction) - 5 Patterns
+| Pattern | Severity | Languages |
+|---------|----------|-----------|
+| SQL Injection Prevention | 🔴 Critical | Python, Go, Java, Scala |
+| Feature Flag for New Features | ✅ Blocking | All |
+| Database Schema Changes with Migration | ✅ Blocking | All |
+| API Breaking Changes Detection | ⚠️ Warning | All |
+| Test Coverage for New Code | ⚠️ Warning | All |
+
+**Legend**: 🔴 Critical | ✅ Blocking | ⚠️ Warning | ℹ️ Info
+
+---
+
+## 🎯 Execution Model
+
+### Automatic on ALL PRs (3 Checks)
+- Target: **Entire codebase**
+- Runs: Every PR automatically
+- Results: ONE consolidated PR comment
+
+```
+PR Created → 3 Parallel Checks → 1 Consolidated Comment
+              ├─ SRE Checks
+              ├─ Operability  
+              └─ Observability
 ```
 
-## 🔒 Governance
+### On-Demand (1 Check)
+- Target: **Changed files only**
+- Runs: Manual trigger via GitHub Actions UI
+- Best for: Feature branch validation before merge
 
-- **CODEOWNERS**: `@sre-team` must approve all changes
-- **Branch Protection**: PRs required, tests must pass
-- **Versioning**: Semantic versioning (major.minor.patch)
-- **Changelog**: Document all changes
-
-## 📞 Support
-
-- **Questions**: #sre-standards Slack channel
-- **Issues**: GitHub Issues in this repo
-- **Docs**: [Full documentation](./docs/)
-
-## 🚀 Quick Commands
-
-```bash
-# For SREs
-make generate     # Generate from YAML
-make validate     # Check YAML syntax
-make test         # Test generated scripts
-make version      # Show current version
-make bump-minor   # Increment version
-
-# For Developers
-sre-sync          # Update to latest
-make sre-check    # Run checks locally
+```
+Manual Trigger → NPI Checks → Changed files vs. main branch
 ```
 
 ---
 
-**Maintained by**: SRE Team
-**Last updated**: 2026-03-26
-**Version**: 2.1.0
+## 🔄 Zero-Sync Benefits
+
+### For Developers
+✅ **One-time setup** - Add 1 workflow file, never update it  
+✅ **Always current** - Automatically uses latest standards  
+✅ **No maintenance** - SRE team handles all updates  
+✅ **Fast feedback** - Results in PR comments within 1 minute  
+✅ **Local testing** - Run same checks via Makefile before pushing
+
+### For SRE Team
+✅ **Single source of truth** - 1 YAML file controls all checks  
+✅ **Instant distribution** - Update once, affects all services immediately  
+✅ **Version control** - All changes tracked in git  
+✅ **Easy rollback** - Revert commit to undo changes  
+✅ **No coordination overhead** - No need to update 50+ service repos
+
+---
+
+## 📖 Local Development
+
+### Add Makefile Targets (Optional)
+
+```makefile
+# Run all checks locally before pushing
+sre-check-all:
+	@curl -fsSL https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/generated/check-sre-top5.sh | bash
+	@curl -fsSL https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/generated/check-operability-top5.sh | bash
+	@curl -fsSL https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/generated/check-observability-top5.sh | bash
+
+# Individual checks
+sre-check:
+	@curl -fsSL https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/generated/check-sre-top5.sh | bash
+
+operability-check:
+	@curl -fsSL https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/generated/check-operability-top5.sh | bash
+
+observability-check:
+	@curl -fsSL https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/generated/check-observability-top5.sh | bash
+
+npi-check:
+	@curl -fsSL https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/generated/check-npi-top5.sh | bash
+```
+
+Usage:
+```bash
+make sre-check-all  # Before committing
+make npi-check      # On feature branches
+```
+
+---
+
+## 📞 Support
+
+- **Questions**: #sre-standards Slack channel
+- **Issues**: [GitHub Issues](https://github.com/ns-fazhar/sre-standards/issues)
+- **Documentation**: This README + inline comments in workflow files
+
+---
+
+## 🚀 Quick Reference
+
+### For Developers
+```bash
+# 1. Add workflow file (one-time)
+curl -o .github/workflows/sre-checks.yml \
+  https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/templates/service-sre-checks.yml
+
+# 2. Commit and push
+git add .github/workflows/sre-checks.yml
+git commit -m "Enable SRE standard checks"
+git push
+
+# 3. Done! PR checks now run automatically
+```
+
+### For SRE Team
+```bash
+# 1. Edit standards
+vim mappings/sre-top5-patterns.yaml
+
+# 2. Generate scripts
+make generate
+
+# 3. Test and push
+make test
+git add .
+git commit -m "Update SRE standards"
+git push
+
+# 4. All services get updates automatically
+```
+
+---
+
+**Maintained by**: SRE Team  
+**Version**: 4.0.0  
+**Last Updated**: 2026-04-23
