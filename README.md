@@ -1,6 +1,6 @@
 # SRE Standards - Central Control Repository
 
-**Version**: 2.1.0
+**Version**: 4.0.0 (Top 5 Patterns)
 **Owner**: SRE Team
 **Purpose**: Single source of truth for SRE checks, skills, and standards
 
@@ -85,24 +85,42 @@ git push
 
 ## 📊 For Engineering Teams: How to Use
 
-### Option 1: GitHub Actions (Recommended)
+### Option 1: GitHub Actions (Recommended) - Top 5 Checks
 
-Add to your service repo:
+Copy the template to your service repo:
+
+```bash
+# Copy template to your service
+curl -o .github/workflows/sre-checks.yml \
+  https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/templates/service-sre-checks.yml
+```
+
+Or create manually:
 
 ```yaml
 # .github/workflows/sre-checks.yml
 name: SRE Checks
 
-on: [pull_request]
+on:
+  pull_request:
+    branches: [main, develop]
 
 jobs:
-  sre:
-    uses: ns-fazhar/sre-standards/.github/workflows/sre-checks-reusable.yml@main
+  sre-top5-checks:
+    permissions:
+      contents: read
+      pull-requests: write
+    uses: ns-fazhar/sre-standards/.github/workflows/sre-checks-top5-reusable.yml@main
     with:
       fail_on_issues: false  # Set true to block PRs with issues
+      run_npi: true          # Run NPI checks on feature branches
 ```
 
-**That's it!** Your PRs will automatically get SRE checks.
+**That's it!** Your PRs will automatically get:
+- ✅ SRE Checks (Reliability & Resilience) - All PRs
+- ✅ Operability Checks - All PRs  
+- ✅ Observability Checks - All PRs
+- ✅ NPI Checks - Feature branches only
 
 ### Option 2: Local Development with Claude
 
@@ -157,6 +175,27 @@ sre-check-local:
 - ✅ Runbook
 
 Legend: ✅ = Blocking | ⚠️ = Warning
+
+## 🎯 Execution Model - 4 Check Types, 2 Modes
+
+### Mode 1: Continuous Validation (3 checks)
+Run on **ALL PRs** - scan **entire codebase**
+
+1. **🔧 SRE Checks (Reliability)**: HTTP timeouts, circuit breakers, resource leaks
+2. **⚙️ Operability**: No secrets, graceful shutdown, Dockerfile
+3. **📊 Observability**: Prometheus metrics, SUMO logging
+
+### Mode 2: Feature Validation (1 check)
+Run on **FEATURE BRANCHES** - scan **changed files only**
+
+4. **🚀 NPI (New Product Introduction)**: SQL injection, feature flags, migrations, breaking changes, tests
+
+| Check | When | Target | Purpose |
+|-------|------|--------|---------|
+| SRE Checks | All PRs | Entire codebase | Maintain reliability standards |
+| Operability | All PRs | Entire codebase | Ensure operability |
+| Observability | All PRs | Entire codebase | Maintain visibility |
+| NPI | Feature branches | Changed files | Validate new features |
 
 ## 🔄 How It Works
 
