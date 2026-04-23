@@ -10,6 +10,22 @@
 
 **SRE Standards** is a **centralized control repository** that defines, generates, and distributes SRE checks to all services across the organization. 
 
+### The Problem
+
+Developers commit code without knowing they're missing critical reliability, observability, and operational patterns - these gaps surface during code reviews or, worse, production incidents. Traditional approaches rely on tribal knowledge, manual checklists, or post-merge detection, resulting in:
+- ❌ **Late discovery** of issues (during review or in production)
+- ❌ **Inconsistent standards** across teams and services
+- ❌ **Costly rework** when patterns must be retrofitted
+- ❌ **Knowledge silos** - SRE expertise doesn't reach developers
+
+### The Solution
+
+SRE Standards provides **shift-left feedback** via automated checks that scan code and identify what's missing **before commit**, embedding SRE expertise directly into the development workflow:
+- ✅ **Early detection** - Catch issues in IDE or pre-commit
+- ✅ **Consistent enforcement** - Same standards across all services
+- ✅ **Proactive guidance** - Learn patterns as you code
+- ✅ **Zero maintenance** - Updates propagate automatically
+
 Think of it as a **broadcast tower** 📡:
 - SRE Team updates standards **once** in this repo
 - All service repos automatically get updates via `@main` references
