@@ -122,7 +122,16 @@ jobs:
             const operabilityStatus = operabilityCode === '0' ? '✅ PASSED' : '❌ ISSUES FOUND';
             const observabilityStatus = observabilityCode === '0' ? '✅ PASSED' : '❌ ISSUES FOUND';
 
+            const guidanceMode = !${{ inputs.fail_on_issues }};
+            const modeEmoji = guidanceMode ? '💡' : '🚫';
+            const modeText = guidanceMode ? 'GUIDANCE MODE' : 'ENFORCEMENT MODE';
+            const modeDescription = guidanceMode
+              ? '**This check is non-blocking** - You can merge this PR, but please address issues before production deployment.'
+              : '**This check is blocking** - Critical issues must be fixed before merging.';
+
             const body = `## SRE Standard Checks: ${overallStatus}
+
+            ${modeEmoji} **${modeText}**: ${modeDescription}
 
             **SRE Standards Version**: \`${sreVersion}\`
             **Summary**: ${totalCritical} critical issue(s), ${totalWarnings} warning(s) across 3 checks
