@@ -333,36 +333,207 @@ Manual Trigger → NPI Checks → Changed files vs. main branch
 
 ---
 
-## 📖 Local Development
+## 📖 Local Development Guide
 
-### Add Makefile Targets (Optional)
+Developers can run SRE checks locally **before pushing** to catch issues early. Two options available:
+
+### Option 1: Interactive Development with Claude Code (Recommended)
+
+**Best for:** Deep analysis, explanations, and guided fixes
+
+#### One-Time Setup
+
+```bash
+# Install Claude Code (if not already installed)
+# macOS: Download from https://claude.ai/download
+# Or via Homebrew:
+brew install --cask claude
+
+# Add skills to your local Claude
+cd ~/.claude/skills
+curl -O https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/skills/sre-checks-top5.md
+curl -O https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/skills/operability-top5.md
+curl -O https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/skills/observability-top5.md
+curl -O https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/skills/npi-top5.md
+```
+
+#### Daily Usage
+
+```bash
+cd your-service
+
+# Start Claude Code
+claude code
+
+# In Claude, run interactive checks:
+> /sre-checks-top5        # Deep SRE reliability analysis
+> /operability-top5       # Operability review
+> /observability-top5     # Observability validation
+> /npi-top5              # NPI feature validation (feature branches)
+```
+
+**What you get:**
+- 🎯 **Contextual analysis** - Claude reads your code and explains issues
+- 🔧 **Guided fixes** - Step-by-step instructions with code examples
+- 💡 **Why it matters** - Explains impact and best practices
+- 🚀 **Interactive** - Ask follow-up questions, request alternatives
+
+**Example interaction:**
+```
+You: /operability-top5
+
+Claude: Running Operability checks on your service...
+
+❌ CRITICAL: Hardcoded secret detected
+   Location: src/config.py:12
+   Issue: API key 'sk-abc123' is hardcoded
+   
+   Why this matters:
+   Hardcoded secrets can be leaked via git history, accessed by 
+   unauthorized users, and are difficult to rotate in emergencies.
+   
+   How to fix:
+   1. Move the API key to an environment variable
+   2. Add to .env.example (without the actual value)
+   3. Update code to read from environment
+   
+   Code example:
+   # Before
+   API_KEY = "sk-abc123"
+   
+   # After
+   import os
+   API_KEY = os.environ.get('API_KEY')
+   if not API_KEY:
+       raise ValueError("API_KEY environment variable required")
+   
+   Would you like me to make this change for you?
+```
+
+---
+
+### Option 2: Command-Line Scripts (No Claude Required)
+
+**Best for:** Quick validation, CI/CD pipelines, automated checks
+
+#### Add to Your Service's Makefile
 
 ```makefile
-# Run all checks locally before pushing
+.PHONY: sre-check-all sre-check operability-check observability-check npi-check
+
+# Run all checks (recommended before pushing)
 sre-check-all:
+	@echo "🔍 Running ALL SRE Standard Checks..."
+	@echo ""
+	@echo "Running SRE Checks (Reliability)..."
 	@curl -fsSL https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/generated/check-sre-top5.sh | bash
+	@echo ""
+	@echo "Running Operability Checks..."
 	@curl -fsSL https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/generated/check-operability-top5.sh | bash
+	@echo ""
+	@echo "Running Observability Checks..."
 	@curl -fsSL https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/generated/check-observability-top5.sh | bash
+	@echo ""
+	@CURRENT_BRANCH=$$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown"); \
+	if [ "$$CURRENT_BRANCH" != "main" ] && [ "$$CURRENT_BRANCH" != "master" ]; then \
+		echo "Running NPI Checks (feature branch detected)..."; \
+		curl -fsSL https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/generated/check-npi-top5.sh | bash; \
+	else \
+		echo "⏭️  Skipping NPI checks (not on feature branch)"; \
+	fi
 
 # Individual checks
 sre-check:
+	@echo "🔧 Running SRE Checks (Reliability & Resilience)..."
 	@curl -fsSL https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/generated/check-sre-top5.sh | bash
 
 operability-check:
+	@echo "⚙️  Running Operability Checks..."
 	@curl -fsSL https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/generated/check-operability-top5.sh | bash
 
 observability-check:
+	@echo "📊 Running Observability Checks..."
 	@curl -fsSL https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/generated/check-observability-top5.sh | bash
 
 npi-check:
+	@echo "🚀 Running NPI Checks (New Product Introduction)..."
+	@CURRENT_BRANCH=$$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown"); \
+	if [ "$$CURRENT_BRANCH" = "main" ] || [ "$$CURRENT_BRANCH" = "master" ]; then \
+		echo "❌ Error: NPI checks must run on feature branches, not $$CURRENT_BRANCH"; \
+		exit 1; \
+	fi
 	@curl -fsSL https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/generated/check-npi-top5.sh | bash
 ```
 
-Usage:
+#### Daily Usage
+
 ```bash
-make sre-check-all  # Before committing
-make npi-check      # On feature branches
+# Before committing - run all checks
+make sre-check-all
+
+# Run individual checks
+make sre-check            # SRE reliability only
+make operability-check    # Operability only
+make observability-check  # Observability only
+
+# On feature branches - validate new code
+make npi-check
 ```
+
+**What you get:**
+- ✅ **Fast validation** - Complete in ~10 seconds
+- 📋 **Clear output** - Color-coded results with line numbers
+- 🎯 **Actionable** - Shows exactly what to fix
+- 🚫 **Blocking issues** - Returns exit code 1 on critical failures
+
+**Example output:**
+```
+🔧 Running SRE Checks (Reliability & Resilience)...
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[1/5] Checking HTTP Timeout Protection... ❌
+  🔴 CRITICAL: No timeout on HTTP calls
+     Location: src/app.py:37, src/app.py:53
+     Fix: Add timeout=30 parameter to all requests calls
+
+[2/5] Checking Circuit Breaker... ❌
+  🔴 CRITICAL: No circuit breaker for external calls
+     Fix: Install pybreaker and wrap external service calls
+
+[3/5] Checking Resource Leak Prevention... ⚠️
+  🟡 WARNING: HTTP responses not properly closed
+     Fix: Use context managers or try/finally blocks
+
+[4/5] Checking Retry Logic... ✓
+
+[5/5] Checking Health & Readiness Endpoints... ✓
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+❌ CRITICAL ISSUES FOUND
+
+Found 2 critical issue(s), 1 warning(s), and 0 info item(s).
+🔴 Critical issues must be fixed before production deployment.
+```
+
+---
+
+### Option 3: Direct Script Execution (No Dependencies)
+
+**Best for:** Quick one-off checks, testing in containers
+
+```bash
+# One-liner for all checks
+curl -fsSL https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/generated/check-sre-top5.sh | bash && \
+curl -fsSL https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/generated/check-operability-top5.sh | bash && \
+curl -fsSL https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/generated/check-observability-top5.sh | bash
+
+# Individual checks
+curl -fsSL https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/generated/check-sre-top5.sh | bash
+curl -fsSL https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/generated/check-operability-top5.sh | bash
+curl -fsSL https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/generated/check-observability-top5.sh | bash
+curl -fsSL https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/generated/check-npi-top5.sh | bash
+```
+
 
 ---
 
