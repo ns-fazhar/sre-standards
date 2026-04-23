@@ -27,6 +27,12 @@ jobs:
         with:
           fetch-depth: 0  # Need full history for git diff
 
+      - name: Fetch base branch
+        run: |
+          BASE_BRANCH="${{ inputs.base_branch }}"
+          echo "Fetching base branch: $BASE_BRANCH"
+          git fetch origin "$BASE_BRANCH:$BASE_BRANCH" || echo "Base branch already exists"
+
       - name: Validate branch
         run: |
           CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
