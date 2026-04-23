@@ -9,17 +9,12 @@ on:
         default: false
 
 jobs:
-  # ============================================================================
-  # CONTINUOUS VALIDATION: Run on ALL PRs (entire codebase)
-  # ============================================================================
-
-  sre-checks:
-    name: SRE Checks (Reliability & Resilience)
+  sre-standards:
+    name: SRE Standards
     runs-on: ubuntu-latest
-    outputs:
-      exit_code: ${{ steps.checks.outputs.exit_code }}
-      critical: ${{ steps.checks.outputs.critical }}
-      warnings: ${{ steps.checks.outputs.warnings }}
+    permissions:
+      contents: read
+      pull-requests: write
 
     steps:
       - name: Checkout service repository
@@ -37,165 +32,63 @@ jobs:
           echo "📦 Using SRE standards version: $(cat .sre-standards/VERSION)"
           echo ""
 
-      - name: Run SRE reliability checks
-        id: checks
+      # ============================================================================
+      # Run all 3 checks sequentially in one job
+      # ============================================================================
+
+      - name: Run SRE Checks (Reliability & Resilience)
+        id: sre-checks
         continue-on-error: true
         run: |
-          .sre-standards/generated/check-sre-top5.sh 2>&1 | tee check-output.txt
-          EXIT_CODE=${PIPESTATUS[0]}
+          echo "🔧 Running SRE Checks (Reliability & Resilience)..."
+          .sre-standards/generated/check-sre-top5.sh 2>&1 | tee sre-output.txt
+          SRE_EXIT=${PIPESTATUS[0]}
 
-          CRITICAL=$(grep -oP '\d+(?= critical)' check-output.txt | head -1 || echo "0")
-          WARNINGS=$(grep -oP '\d+(?= warning)' check-output.txt | head -1 || echo "0")
+          SRE_CRITICAL=$(grep -oP '\d+(?= critical)' sre-output.txt | head -1 || echo "0")
+          SRE_WARNINGS=$(grep -oP '\d+(?= warning)' sre-output.txt | head -1 || echo "0")
 
-          echo "exit_code=$EXIT_CODE" >> $GITHUB_OUTPUT
-          echo "critical=$CRITICAL" >> $GITHUB_OUTPUT
-          echo "warnings=$WARNINGS" >> $GITHUB_OUTPUT
-          exit 0
+          echo "exit_code=$SRE_EXIT" >> $GITHUB_OUTPUT
+          echo "critical=$SRE_CRITICAL" >> $GITHUB_OUTPUT
+          echo "warnings=$SRE_WARNINGS" >> $GITHUB_OUTPUT
 
-      - name: Upload results artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: sre-results
-          path: check-output.txt
-          retention-days: 7
-
-      - name: Check for critical issues
-        if: inputs.fail_on_issues
-        run: |
-          EXIT_CODE="${{ steps.checks.outputs.exit_code }}"
-          if [ "$EXIT_CODE" != "0" ]; then
-            echo "❌ SRE reliability checks failed"
-            exit 1
-          fi
-
-  operability-checks:
-    name: Operability Checks
-    runs-on: ubuntu-latest
-    outputs:
-      exit_code: ${{ steps.checks.outputs.exit_code }}
-      critical: ${{ steps.checks.outputs.critical }}
-      warnings: ${{ steps.checks.outputs.warnings }}
-
-    steps:
-      - name: Checkout service repository
-        uses: actions/checkout@v4
-
-      - name: Checkout SRE standards
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ github.repository_owner }}/sre-standards
-          path: .sre-standards
-          ref: main
-
-      - name: Run operability checks
-        id: checks
+      - name: Run Operability Checks
+        id: operability-checks
         continue-on-error: true
         run: |
-          .sre-standards/generated/check-operability-top5.sh 2>&1 | tee check-output.txt
-          EXIT_CODE=${PIPESTATUS[0]}
+          echo ""
+          echo "⚙️  Running Operability Checks..."
+          .sre-standards/generated/check-operability-top5.sh 2>&1 | tee operability-output.txt
+          OPS_EXIT=${PIPESTATUS[0]}
 
-          CRITICAL=$(grep -oP '\d+(?= critical)' check-output.txt | head -1 || echo "0")
-          WARNINGS=$(grep -oP '\d+(?= warning)' check-output.txt | head -1 || echo "0")
+          OPS_CRITICAL=$(grep -oP '\d+(?= critical)' operability-output.txt | head -1 || echo "0")
+          OPS_WARNINGS=$(grep -oP '\d+(?= warning)' operability-output.txt | head -1 || echo "0")
 
-          echo "exit_code=$EXIT_CODE" >> $GITHUB_OUTPUT
-          echo "critical=$CRITICAL" >> $GITHUB_OUTPUT
-          echo "warnings=$WARNINGS" >> $GITHUB_OUTPUT
-          exit 0
+          echo "exit_code=$OPS_EXIT" >> $GITHUB_OUTPUT
+          echo "critical=$OPS_CRITICAL" >> $GITHUB_OUTPUT
+          echo "warnings=$OPS_WARNINGS" >> $GITHUB_OUTPUT
 
-      - name: Upload results artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: operability-results
-          path: check-output.txt
-          retention-days: 7
-
-      - name: Check for critical issues
-        if: inputs.fail_on_issues
-        run: |
-          EXIT_CODE="${{ steps.checks.outputs.exit_code }}"
-          if [ "$EXIT_CODE" != "0" ]; then
-            echo "❌ Operability checks failed"
-            exit 1
-          fi
-
-  observability-checks:
-    name: Observability Checks
-    runs-on: ubuntu-latest
-    outputs:
-      exit_code: ${{ steps.checks.outputs.exit_code }}
-      critical: ${{ steps.checks.outputs.critical }}
-      warnings: ${{ steps.checks.outputs.warnings }}
-
-    steps:
-      - name: Checkout service repository
-        uses: actions/checkout@v4
-
-      - name: Checkout SRE standards
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ github.repository_owner }}/sre-standards
-          path: .sre-standards
-          ref: main
-
-      - name: Run observability checks
-        id: checks
+      - name: Run Observability Checks
+        id: observability-checks
         continue-on-error: true
         run: |
-          .sre-standards/generated/check-observability-top5.sh 2>&1 | tee check-output.txt
-          EXIT_CODE=${PIPESTATUS[0]}
+          echo ""
+          echo "📊 Running Observability Checks..."
+          .sre-standards/generated/check-observability-top5.sh 2>&1 | tee observability-output.txt
+          OBS_EXIT=${PIPESTATUS[0]}
 
-          CRITICAL=$(grep -oP '\d+(?= critical)' check-output.txt | head -1 || echo "0")
-          WARNINGS=$(grep -oP '\d+(?= warning)' check-output.txt | head -1 || echo "0")
+          OBS_CRITICAL=$(grep -oP '\d+(?= critical)' observability-output.txt | head -1 || echo "0")
+          OBS_WARNINGS=$(grep -oP '\d+(?= warning)' observability-output.txt | head -1 || echo "0")
 
-          echo "exit_code=$EXIT_CODE" >> $GITHUB_OUTPUT
-          echo "critical=$CRITICAL" >> $GITHUB_OUTPUT
-          echo "warnings=$WARNINGS" >> $GITHUB_OUTPUT
-          exit 0
+          echo "exit_code=$OBS_EXIT" >> $GITHUB_OUTPUT
+          echo "critical=$OBS_CRITICAL" >> $GITHUB_OUTPUT
+          echo "warnings=$OBS_WARNINGS" >> $GITHUB_OUTPUT
 
-      - name: Upload results artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: observability-results
-          path: check-output.txt
-          retention-days: 7
+      # ============================================================================
+      # Post consolidated comment
+      # ============================================================================
 
-      - name: Check for critical issues
-        if: inputs.fail_on_issues
-        run: |
-          EXIT_CODE="${{ steps.checks.outputs.exit_code }}"
-          if [ "$EXIT_CODE" != "0" ]; then
-            echo "❌ Observability checks failed"
-            exit 1
-          fi
-
-  # ============================================================================
-  # POST CONSOLIDATED COMMENT
-  # ============================================================================
-
-  post-consolidated-comment:
-    name: Post Consolidated PR Comment
-    if: github.event_name == 'pull_request'
-    needs: [sre-checks, operability-checks, observability-checks]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pull-requests: write
-
-    steps:
-      - name: Checkout SRE standards
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ github.repository_owner }}/sre-standards
-          path: .sre-standards
-          ref: main
-
-      - name: Download all results
-        uses: actions/download-artifact@v4
-        with:
-          pattern: '*-results'
-          merge-multiple: false
-
-      - name: Post consolidated comment
+      - name: Post consolidated PR comment
+        if: github.event_name == 'pull_request'
         uses: actions/github-script@v7
         with:
           script: |
@@ -203,21 +96,21 @@ jobs:
 
             const sreVersion = fs.readFileSync('.sre-standards/VERSION', 'utf8').trim();
 
-            const sreOutput = fs.readFileSync('sre-results/check-output.txt', 'utf8');
-            const operabilityOutput = fs.readFileSync('operability-results/check-output.txt', 'utf8');
-            const observabilityOutput = fs.readFileSync('observability-results/check-output.txt', 'utf8');
+            const sreOutput = fs.readFileSync('sre-output.txt', 'utf8');
+            const operabilityOutput = fs.readFileSync('operability-output.txt', 'utf8');
+            const observabilityOutput = fs.readFileSync('observability-output.txt', 'utf8');
 
-            const sreCode = '${{ needs.sre-checks.outputs.exit_code }}';
-            const operabilityCode = '${{ needs.operability-checks.outputs.exit_code }}';
-            const observabilityCode = '${{ needs.observability-checks.outputs.exit_code }}';
+            const sreCode = '${{ steps.sre-checks.outputs.exit_code }}';
+            const operabilityCode = '${{ steps.operability-checks.outputs.exit_code }}';
+            const observabilityCode = '${{ steps.observability-checks.outputs.exit_code }}';
 
-            const sreCritical = parseInt('${{ needs.sre-checks.outputs.critical }}' || '0');
-            const operabilityCritical = parseInt('${{ needs.operability-checks.outputs.critical }}' || '0');
-            const observabilityCritical = parseInt('${{ needs.observability-checks.outputs.critical }}' || '0');
+            const sreCritical = parseInt('${{ steps.sre-checks.outputs.critical }}' || '0');
+            const operabilityCritical = parseInt('${{ steps.operability-checks.outputs.critical }}' || '0');
+            const observabilityCritical = parseInt('${{ steps.observability-checks.outputs.critical }}' || '0');
 
-            const sreWarnings = parseInt('${{ needs.sre-checks.outputs.warnings }}' || '0');
-            const operabilityWarnings = parseInt('${{ needs.operability-checks.outputs.warnings }}' || '0');
-            const observabilityWarnings = parseInt('${{ needs.observability-checks.outputs.warnings }}' || '0');
+            const sreWarnings = parseInt('${{ steps.sre-checks.outputs.warnings }}' || '0');
+            const operabilityWarnings = parseInt('${{ steps.operability-checks.outputs.warnings }}' || '0');
+            const observabilityWarnings = parseInt('${{ steps.observability-checks.outputs.warnings }}' || '0');
 
             const totalCritical = sreCritical + operabilityCritical + observabilityCritical;
             const totalWarnings = sreWarnings + operabilityWarnings + observabilityWarnings;
@@ -303,3 +196,18 @@ jobs:
               console.log('Created new PR comment');
             }
 
+      # ============================================================================
+      # Fail workflow if critical issues found
+      # ============================================================================
+
+      - name: Check for critical issues
+        if: inputs.fail_on_issues
+        run: |
+          SRE_EXIT="${{ steps.sre-checks.outputs.exit_code }}"
+          OPS_EXIT="${{ steps.operability-checks.outputs.exit_code }}"
+          OBS_EXIT="${{ steps.observability-checks.outputs.exit_code }}"
+
+          if [ "$SRE_EXIT" != "0" ] || [ "$OPS_EXIT" != "0" ] || [ "$OBS_EXIT" != "0" ]; then
+            echo "❌ SRE standard checks failed"
+            exit 1
+          fi
