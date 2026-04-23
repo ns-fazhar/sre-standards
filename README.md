@@ -269,8 +269,8 @@ git push
 ### 🔧 SRE Checks (Reliability & Resilience) - 5 Patterns
 | Pattern | Severity | Languages |
 |---------|----------|-----------|
-| HTTP Timeout Protection | ✅ Blocking | Python, Go, Java, Scala |
-| Circuit Breaker | ✅ Blocking | Python, Go, Java, Scala |
+| HTTP Timeout Protection | ✅ Blocking | Python, Go, Java, Scala, Node.js |
+| Circuit Breaker | ✅ Blocking | Python, Go, Java, Scala, Node.js |
 | Resource Leak Prevention | ⚠️ Warning | Python, Go, Java |
 | Retry with Exponential Backoff | ⚠️ Warning | Python, Go, Java, Scala |
 | Health & Readiness Endpoints | ✅ Blocking | All |

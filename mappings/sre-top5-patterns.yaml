@@ -7,7 +7,7 @@ metadata:
   last_updated: "2026-04-23"
   maintainer: "SRE Team"
   description: "Top 5 most critical patterns for each SRE category"
-  languages_supported: ["python", "go", "java", "scala"]
+  languages_supported: ["python", "go", "java", "scala", "javascript", "typescript"]
   observability_stack:
     metrics: "Prometheus"
     logging: "SUMO Logic"
@@ -52,6 +52,13 @@ sre_checks:
           exclude: 'setConnectTimeout|setReadTimeout|connectTimeout'
           file_types: ["*.java"]
           message: "HTTP client without timeout configuration"
+
+        # JavaScript/Node.js - axios/fetch without timeout
+        - language: javascript
+          pattern: 'axios\.(get|post|put|delete|patch)\([^)]*\)|fetch\([^)]*\)'
+          exclude: 'timeout\s*:|signal\s*:'
+          file_types: ["*.js", "*.ts", "*.jsx", "*.tsx"]
+          message: "HTTP call without timeout (axios) or AbortSignal (fetch)"
 
       guidance:
         description: "All HTTP calls must have timeout parameters to prevent indefinite hangs"
@@ -98,9 +105,35 @@ sre_checks:
             .get(uri"$url")
             .readTimeout(10.seconds)
             .response(asString)
+
+          # Node.js - axios
+          // ❌ BAD - No timeout
+          const response = await axios.get(url);
+
+          // ✅ GOOD - With timeout
+          const response = await axios.get(url, {
+            timeout: 10000  // 10 seconds
+          });
+
+          # Node.js - fetch with AbortController
+          // ❌ BAD - No timeout
+          const response = await fetch(url);
+
+          // ✅ GOOD - With AbortSignal timeout
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 10000);
+          const response = await fetch(url, { signal: controller.signal });
+          clearTimeout(timeoutId);
+
+          // ✅ BETTER - Using AbortSignal.timeout (Node.js 17.3+)
+          const response = await fetch(url, {
+            signal: AbortSignal.timeout(10000)
+          });
         references:
           - "https://requests.readthedocs.io/en/latest/user/advanced/#timeouts"
           - "https://pkg.go.dev/net/http#Client"
+          - "https://axios-http.com/docs/req_config"
+          - "https://developer.mozilla.org/en-US/docs/Web/API/AbortSignal/timeout"
 
     # ========================================
     # 2. CIRCUIT BREAKER
@@ -123,6 +156,12 @@ sre_checks:
           pattern: 'http\.Client|grpc\.Dial'
           exclude: 'hystrix|circuitbreaker|gobreaker'
           file_types: ["*.go"]
+          message: "External service calls without circuit breaker protection"
+
+        - language: javascript
+          pattern: 'axios\.|fetch\('
+          exclude: 'opossum|circuitBreaker|Breaker'
+          file_types: ["*.js", "*.ts", "*.jsx", "*.tsx"]
           message: "External service calls without circuit breaker protection"
 
         - language: java
@@ -190,10 +229,27 @@ sre_checks:
           )
 
           breaker.withCircuitBreaker(callPaymentGateway(data))
+
+          # Node.js - opossum circuit breaker
+          const CircuitBreaker = require('opossum');
+
+          const options = {
+            timeout: 10000,        // 10 second timeout
+            errorThresholdPercentage: 50,  // Open circuit at 50% failure rate
+            resetTimeout: 30000    // Try again after 30 seconds
+          };
+
+          const breaker = new CircuitBreaker(callPaymentGateway, options);
+
+          // Use the circuit breaker
+          breaker.fire(data)
+            .then(result => console.log(result))
+            .catch(err => console.error('Circuit breaker prevented call or call failed'));
         references:
           - "https://martinfowler.com/bliki/CircuitBreaker.html"
           - "https://github.com/sony/gobreaker"
           - "https://resilience4j.readme.io/docs/circuitbreaker"
+          - "https://nodeshift.dev/opossum/"
 
     # ========================================
     # 3. RESOURCE LEAK PREVENTION
