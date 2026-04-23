@@ -1,11 +1,12 @@
-# SRE Top 5 Checks - Copy this to your service repo
+# SRE Standard Checks - Copy this to your service repo
 # Location: .github/workflows/sre-checks.yml
 #
-# This workflow runs 4 types of checks:
-# 1. SRE Checks (Reliability) - All PRs, entire codebase
-# 2. Operability - All PRs, entire codebase
-# 3. Observability - All PRs, entire codebase
-# 4. NPI (New Product Introduction) - Feature branches only, changed files
+# This workflow runs 3 types of checks on ALL PRs:
+# 1. SRE Checks (Reliability) - entire codebase
+# 2. Operability - entire codebase
+# 3. Observability - entire codebase
+#
+# NPI checks are run separately on-demand via workflow_dispatch
 
 name: SRE Checks
 
@@ -16,95 +17,97 @@ on:
     branches: [main]
 
 jobs:
-  sre-top5-checks:
-    name: SRE Top 5 Standards
+  sre-standard-checks:
+    name: SRE Standards
     permissions:
       contents: read
       pull-requests: write
 
     # Reference the central sre-standards repo
     # ✅ Always pulls latest from @main - zero maintenance!
-    uses: ns-fazhar/sre-standards/.github/workflows/sre-checks-top5-reusable.yml@main
+    uses: ns-fazhar/sre-standards/.github/workflows/sre-standard-checks.yml@main
 
     with:
       # Set to true to BLOCK PR merges on critical issues
       fail_on_issues: false
 
-      # Set to false to disable NPI checks (not recommended)
-      run_npi: true
-
 # ============================================================================
 # Configuration Options
 # ============================================================================
 
-# fail_on_issues: false
-#   - PRs can be merged even with issues (guidance mode)
+# fail_on_issues: false (default - guidance mode)
+#   - PRs can be merged even with issues
 #   - Good for initial rollout
 #   - Team gets familiar with checks before enforcement
 #
-# fail_on_issues: true
+# fail_on_issues: true (enforcement mode)
 #   - PRs BLOCKED if critical issues found
 #   - Enforces standards before merge
 #   - Recommended after team is comfortable with checks
 
-# run_npi: true (recommended)
-#   - Validates new features on feature branches
-#   - Checks: SQL injection, feature flags, migrations, breaking changes, tests
-#   - Only runs on feature branches (not main/master)
+# ============================================================================
+# What Gets Checked on Every PR (Automatic)
+# ============================================================================
+
+# 🔧 SRE Checks (Reliability & Resilience)
+#   ✓ HTTP Timeout Protection (BLOCKING)
+#   ✓ Circuit Breaker (BLOCKING)
+#   ✓ Resource Leak Prevention
+#   ✓ Retry with Exponential Backoff
+#   ✓ Health & Readiness Endpoints
+
+# ⚙️ Operability
+#   ✓ No Hardcoded Secrets (CRITICAL)
+#   ✓ Graceful Shutdown
+#   ✓ Environment Variables Documented
+#   ✓ Dockerfile Present
+#   ✓ Configuration Validation
+
+# 📊 Observability
+#   ✓ Prometheus Metrics Instrumentation
+#   ✓ Metrics Endpoint
+#   ✓ Central Logging to SUMO Logic
+#   ✓ Request Duration Tracking
+#   ✓ Request ID Propagation
+
+# ============================================================================
+# NPI Checks (On-Demand Only)
+# ============================================================================
+
+# 🚀 NPI (New Product Introduction) - Run manually via workflow_dispatch
+#   ✓ SQL Injection Prevention (CRITICAL)
+#   ✓ Feature Flag Detection
+#   ✓ Database Migrations
+#   ✓ API Breaking Changes
+#   ✓ Test Coverage
 #
-# run_npi: false
-#   - Disables NPI checks
-#   - Not recommended - misses critical feature validation
-
-# ============================================================================
-# What Gets Checked
-# ============================================================================
-
-# 🔧 SRE Checks (Reliability & Resilience) - ALL PRs
-#   ✓ HTTP Timeout Protection (95% confidence, BLOCKING)
-#   ✓ Circuit Breaker (90%, BLOCKING)
-#   ✓ Resource Leak Prevention (85%)
-#   ✓ Retry with Exponential Backoff (88%)
-#   ✓ Health & Readiness Endpoints (90%)
-
-# ⚙️ Operability - ALL PRs
-#   ✓ No Hardcoded Secrets (99%, CRITICAL)
-#   ✓ Graceful Shutdown (85%)
-#   ✓ Environment Variables Documented (75%)
-#   ✓ Dockerfile Present (88%)
-#   ✓ Configuration Validation (78%)
-
-# 📊 Observability - ALL PRs
-#   ✓ Prometheus Metrics Instrumentation (92%)
-#   ✓ Metrics Endpoint (90%)
-#   ✓ Central Logging to SUMO Logic (87%)
-#   ✓ Request Duration Tracking (85%)
-#   ✓ Request ID Propagation (80%)
-
-# 🚀 NPI (New Product Introduction) - FEATURE BRANCHES ONLY
-#   ✓ SQL Injection Prevention (99%, CRITICAL)
-#   ✓ Feature Flag Detection (85%)
-#   ✓ Database Migrations (88%)
-#   ✓ API Breaking Changes (82%)
-#   ✓ Test Coverage (85%)
+# To run NPI checks:
+#   1. Go to Actions tab in GitHub
+#   2. Select "NPI Checks (On-Demand)" workflow
+#   3. Click "Run workflow"
+#   4. Select your feature branch
+#   5. Click "Run workflow" button
+#
+# Or use GitHub CLI:
+#   gh workflow run npi-checks-manual.yml --ref feature/my-branch
 
 # ============================================================================
 # Local Testing
 # ============================================================================
 
-# Before pushing your PR, test locally:
+# Test all 3 automatic checks locally before pushing:
+#   make sre-check            # SRE reliability
+#   make operability-check    # Operability
+#   make observability-check  # Observability
 #
-# # Test SRE checks
-# curl -fsSL https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/generated/check-sre-top5.sh | bash
+# Test NPI manually (on feature branch):
+#   make npi-check
 #
-# # Test operability
-# curl -fsSL https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/generated/check-operability-top5.sh | bash
-#
-# # Test observability
-# curl -fsSL https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/generated/check-observability-top5.sh | bash
-#
-# # Test NPI (on feature branch)
-# curl -fsSL https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/generated/check-npi-top5.sh | bash
+# Or use direct curl:
+#   curl -fsSL https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/generated/check-sre-top5.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/generated/check-operability-top5.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/generated/check-observability-top5.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/generated/check-npi-top5.sh | bash
 
 # ============================================================================
 # Support

@@ -85,7 +85,7 @@ git push
 
 ## 📊 For Engineering Teams: How to Use
 
-### Option 1: GitHub Actions (Recommended) - Top 5 Checks
+### Option 1: GitHub Actions (Recommended)
 
 Copy the template to your service repo:
 
@@ -106,21 +106,21 @@ on:
     branches: [main, develop]
 
 jobs:
-  sre-top5-checks:
+  sre-standard-checks:
     permissions:
       contents: read
       pull-requests: write
-    uses: ns-fazhar/sre-standards/.github/workflows/sre-checks-top5-reusable.yml@main
+    uses: ns-fazhar/sre-standards/.github/workflows/sre-standard-checks.yml@main
     with:
       fail_on_issues: false  # Set true to block PRs with issues
-      run_npi: true          # Run NPI checks on feature branches
 ```
 
 **That's it!** Your PRs will automatically get:
 - ✅ SRE Checks (Reliability & Resilience) - All PRs
 - ✅ Operability Checks - All PRs  
 - ✅ Observability Checks - All PRs
-- ✅ NPI Checks - Feature branches only
+
+**NPI checks** run on-demand via workflow_dispatch (GitHub Actions UI)
 
 ### Option 2: Local Development with Claude
 
@@ -176,26 +176,26 @@ sre-check-local:
 
 Legend: ✅ = Blocking | ⚠️ = Warning
 
-## 🎯 Execution Model - 4 Check Types, 2 Modes
+## 🎯 Execution Model - 3 Automatic + 1 On-Demand
 
-### Mode 1: Continuous Validation (3 checks)
-Run on **ALL PRs** - scan **entire codebase**
+### Automatic on ALL PRs (3 checks)
+Run on **every PR** - scan **entire codebase**
 
 1. **🔧 SRE Checks (Reliability)**: HTTP timeouts, circuit breakers, resource leaks
 2. **⚙️ Operability**: No secrets, graceful shutdown, Dockerfile
 3. **📊 Observability**: Prometheus metrics, SUMO logging
 
-### Mode 2: Feature Validation (1 check)
-Run on **FEATURE BRANCHES** - scan **changed files only**
+### On-Demand Manual Run (1 check)
+Run **manually** via workflow_dispatch - scan **changed files only**
 
 4. **🚀 NPI (New Product Introduction)**: SQL injection, feature flags, migrations, breaking changes, tests
 
-| Check | When | Target | Purpose |
-|-------|------|--------|---------|
-| SRE Checks | All PRs | Entire codebase | Maintain reliability standards |
-| Operability | All PRs | Entire codebase | Ensure operability |
-| Observability | All PRs | Entire codebase | Maintain visibility |
-| NPI | Feature branches | Changed files | Validate new features |
+| Check | When | Target | How to Run |
+|-------|------|--------|------------|
+| SRE Checks | All PRs (auto) | Entire codebase | Automatic |
+| Operability | All PRs (auto) | Entire codebase | Automatic |
+| Observability | All PRs (auto) | Entire codebase | Automatic |
+| NPI | On-demand | Changed files | GitHub Actions UI → "Run workflow" |
 
 ## 🔄 How It Works
 

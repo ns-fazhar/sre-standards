@@ -1,0 +1,104 @@
+name: NPI Checks (On-Demand)
+
+# NPI (New Product Introduction) checks are run MANUALLY on feature branches
+# These validate new features before merge
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_branch:
+        description: 'Base branch to compare against (default: main)'
+        required: false
+        default: 'main'
+        type: string
+
+jobs:
+  npi-validation:
+    name: NPI Feature Validation
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Need full history for git diff
+
+      - name: Validate branch
+        run: |
+          CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+          echo "Current branch: $CURRENT_BRANCH"
+
+          if [ "$CURRENT_BRANCH" = "main" ] || [ "$CURRENT_BRANCH" = "master" ]; then
+            echo "❌ Error: NPI checks must run on feature branches, not $CURRENT_BRANCH"
+            echo ""
+            echo "Please run this workflow from a feature branch."
+            exit 1
+          fi
+
+          echo "✅ Running NPI checks on feature branch: $CURRENT_BRANCH"
+
+      - name: Checkout SRE standards
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository_owner }}/sre-standards
+          path: .sre-standards
+          ref: main
+
+      - name: Run NPI checks
+        id: checks
+        continue-on-error: true
+        env:
+          BASE_BRANCH: ${{ inputs.base_branch }}
+        run: |
+          echo "🔍 Running NPI checks..."
+          echo "Base branch: $BASE_BRANCH"
+          echo "Current branch: $(git rev-parse --abbrev-ref HEAD)"
+          echo ""
+
+          .sre-standards/generated/check-npi-top5.sh 2>&1 | tee check-output.txt
+          EXIT_CODE=${PIPESTATUS[0]}
+          echo "exit_code=$EXIT_CODE" >> $GITHUB_OUTPUT
+
+      - name: Post summary
+        run: |
+          EXIT_CODE="${{ steps.checks.outputs.exit_code }}"
+
+          echo "## 🚀 NPI Check Results"
+          echo ""
+
+          if [ "$EXIT_CODE" = "0" ]; then
+            echo "✅ **All NPI checks passed!**"
+            echo ""
+            echo "Your new feature code meets SRE standards."
+          else
+            echo "❌ **NPI checks found issues**"
+            echo ""
+            echo "Review the output above and fix issues before merging."
+            echo ""
+            echo "### Common Issues:"
+            echo "- SQL Injection: Use parameterized queries"
+            echo "- Feature Flags: Wrap new features in feature flags"
+            echo "- Migrations: Add migration files for schema changes"
+            echo "- Breaking Changes: Don't remove API fields/endpoints"
+            echo "- Test Coverage: Add tests for new code"
+          fi
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: npi-check-results
+          path: check-output.txt
+          retention-days: 30
+
+      - name: Fail if issues found
+        run: |
+          EXIT_CODE="${{ steps.checks.outputs.exit_code }}"
+          if [ "$EXIT_CODE" != "0" ]; then
+            echo "❌ NPI checks failed"
+            exit 1
+          fi
