@@ -16,9 +16,10 @@ jobs:
   sre-checks:
     name: SRE Checks (Reliability & Resilience)
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pull-requests: write
+    outputs:
+      exit_code: ${{ steps.checks.outputs.exit_code }}
+      critical: ${{ steps.checks.outputs.critical }}
+      warnings: ${{ steps.checks.outputs.warnings }}
 
     steps:
       - name: Checkout service repository
@@ -42,70 +43,21 @@ jobs:
         run: |
           .sre-standards/generated/check-sre-top5.sh 2>&1 | tee check-output.txt
           EXIT_CODE=${PIPESTATUS[0]}
+
+          CRITICAL=$(grep -oP '\d+(?= critical)' check-output.txt | head -1 || echo "0")
+          WARNINGS=$(grep -oP '\d+(?= warning)' check-output.txt | head -1 || echo "0")
+
           echo "exit_code=$EXIT_CODE" >> $GITHUB_OUTPUT
+          echo "critical=$CRITICAL" >> $GITHUB_OUTPUT
+          echo "warnings=$WARNINGS" >> $GITHUB_OUTPUT
           exit 0
 
-      - name: Post PR comment
-        if: github.event_name == 'pull_request'
-        uses: actions/github-script@v7
+      - name: Upload results artifact
+        uses: actions/upload-artifact@v3
         with:
-          script: |
-            const fs = require('fs');
-            const output = fs.readFileSync('check-output.txt', 'utf8');
-            const exitCode = '${{ steps.checks.outputs.exit_code }}';
-            const sreVersion = fs.readFileSync('.sre-standards/VERSION', 'utf8').trim();
-
-            const status = exitCode === '0' ? '✅ PASSED' : '❌ ISSUES FOUND';
-
-            const criticalMatch = output.match(/(\d+) critical/i);
-            const warningsMatch = output.match(/(\d+) warning/i);
-            const critical = criticalMatch ? criticalMatch[1] : '0';
-            const warnings = warningsMatch ? warningsMatch[1] : '0';
-
-            const body = `## 🔧 SRE Checks (Reliability & Resilience): ${status}
-
-            **SRE Standards Version**: \`${sreVersion}\`
-            **Summary**: ${critical} critical issue(s), ${warnings} warning(s)
-
-            <details>
-            <summary>📄 Click to see detailed results</summary>
-
-            \`\`\`
-            ${output}
-            \`\`\`
-
-            </details>
-
-            ---
-            🤖 Powered by [sre-standards](https://github.com/${context.repo.owner}/sre-standards) v${sreVersion}
-            `;
-
-            const { data: comments } = await github.rest.issues.listComments({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-            });
-
-            const botComment = comments.find(comment =>
-              comment.user.type === 'Bot' &&
-              comment.body.includes('SRE Checks (Reliability & Resilience)')
-            );
-
-            if (botComment) {
-              await github.rest.issues.updateComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                comment_id: botComment.id,
-                body: body
-              });
-            } else {
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: context.issue.number,
-                body: body
-              });
-            }
+          name: sre-results
+          path: check-output.txt
+          retention-days: 7
 
       - name: Check for critical issues
         if: inputs.fail_on_issues
@@ -119,9 +71,10 @@ jobs:
   operability-checks:
     name: Operability Checks
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pull-requests: write
+    outputs:
+      exit_code: ${{ steps.checks.outputs.exit_code }}
+      critical: ${{ steps.checks.outputs.critical }}
+      warnings: ${{ steps.checks.outputs.warnings }}
 
     steps:
       - name: Checkout service repository
@@ -140,70 +93,21 @@ jobs:
         run: |
           .sre-standards/generated/check-operability-top5.sh 2>&1 | tee check-output.txt
           EXIT_CODE=${PIPESTATUS[0]}
+
+          CRITICAL=$(grep -oP '\d+(?= critical)' check-output.txt | head -1 || echo "0")
+          WARNINGS=$(grep -oP '\d+(?= warning)' check-output.txt | head -1 || echo "0")
+
           echo "exit_code=$EXIT_CODE" >> $GITHUB_OUTPUT
+          echo "critical=$CRITICAL" >> $GITHUB_OUTPUT
+          echo "warnings=$WARNINGS" >> $GITHUB_OUTPUT
           exit 0
 
-      - name: Post PR comment
-        if: github.event_name == 'pull_request'
-        uses: actions/github-script@v7
+      - name: Upload results artifact
+        uses: actions/upload-artifact@v3
         with:
-          script: |
-            const fs = require('fs');
-            const output = fs.readFileSync('check-output.txt', 'utf8');
-            const exitCode = '${{ steps.checks.outputs.exit_code }}';
-            const sreVersion = fs.readFileSync('.sre-standards/VERSION', 'utf8').trim();
-
-            const status = exitCode === '0' ? '✅ PASSED' : '❌ ISSUES FOUND';
-
-            const criticalMatch = output.match(/(\d+) critical/i);
-            const warningsMatch = output.match(/(\d+) warning/i);
-            const critical = criticalMatch ? criticalMatch[1] : '0';
-            const warnings = warningsMatch ? warningsMatch[1] : '0';
-
-            const body = `## ⚙️ Operability Checks: ${status}
-
-            **SRE Standards Version**: \`${sreVersion}\`
-            **Summary**: ${critical} critical issue(s), ${warnings} warning(s)
-
-            <details>
-            <summary>📄 Click to see detailed results</summary>
-
-            \`\`\`
-            ${output}
-            \`\`\`
-
-            </details>
-
-            ---
-            🤖 Powered by [sre-standards](https://github.com/${context.repo.owner}/sre-standards) v${sreVersion}
-            `;
-
-            const { data: comments } = await github.rest.issues.listComments({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-            });
-
-            const botComment = comments.find(comment =>
-              comment.user.type === 'Bot' &&
-              comment.body.includes('Operability Checks')
-            );
-
-            if (botComment) {
-              await github.rest.issues.updateComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                comment_id: botComment.id,
-                body: body
-              });
-            } else {
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: context.issue.number,
-                body: body
-              });
-            }
+          name: operability-results
+          path: check-output.txt
+          retention-days: 7
 
       - name: Check for critical issues
         if: inputs.fail_on_issues
@@ -217,9 +121,10 @@ jobs:
   observability-checks:
     name: Observability Checks
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pull-requests: write
+    outputs:
+      exit_code: ${{ steps.checks.outputs.exit_code }}
+      critical: ${{ steps.checks.outputs.critical }}
+      warnings: ${{ steps.checks.outputs.warnings }}
 
     steps:
       - name: Checkout service repository
@@ -238,37 +143,126 @@ jobs:
         run: |
           .sre-standards/generated/check-observability-top5.sh 2>&1 | tee check-output.txt
           EXIT_CODE=${PIPESTATUS[0]}
+
+          CRITICAL=$(grep -oP '\d+(?= critical)' check-output.txt | head -1 || echo "0")
+          WARNINGS=$(grep -oP '\d+(?= warning)' check-output.txt | head -1 || echo "0")
+
           echo "exit_code=$EXIT_CODE" >> $GITHUB_OUTPUT
+          echo "critical=$CRITICAL" >> $GITHUB_OUTPUT
+          echo "warnings=$WARNINGS" >> $GITHUB_OUTPUT
           exit 0
 
-      - name: Post PR comment
-        if: github.event_name == 'pull_request'
+      - name: Upload results artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: observability-results
+          path: check-output.txt
+          retention-days: 7
+
+      - name: Check for critical issues
+        if: inputs.fail_on_issues
+        run: |
+          EXIT_CODE="${{ steps.checks.outputs.exit_code }}"
+          if [ "$EXIT_CODE" != "0" ]; then
+            echo "❌ Observability checks failed"
+            exit 1
+          fi
+
+  # ============================================================================
+  # POST CONSOLIDATED COMMENT
+  # ============================================================================
+
+  post-consolidated-comment:
+    name: Post Consolidated PR Comment
+    if: github.event_name == 'pull_request'
+    needs: [sre-checks, operability-checks, observability-checks]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Checkout SRE standards
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository_owner }}/sre-standards
+          path: .sre-standards
+          ref: main
+
+      - name: Download all results
+        uses: actions/download-artifact@v3
+
+      - name: Post consolidated comment
         uses: actions/github-script@v7
         with:
           script: |
             const fs = require('fs');
-            const output = fs.readFileSync('check-output.txt', 'utf8');
-            const exitCode = '${{ steps.checks.outputs.exit_code }}';
+
             const sreVersion = fs.readFileSync('.sre-standards/VERSION', 'utf8').trim();
 
-            const status = exitCode === '0' ? '✅ PASSED' : '❌ ISSUES FOUND';
+            const sreOutput = fs.readFileSync('sre-results/check-output.txt', 'utf8');
+            const operabilityOutput = fs.readFileSync('operability-results/check-output.txt', 'utf8');
+            const observabilityOutput = fs.readFileSync('observability-results/check-output.txt', 'utf8');
 
-            const criticalMatch = output.match(/(\d+) critical/i);
-            const warningsMatch = output.match(/(\d+) warning/i);
-            const critical = criticalMatch ? criticalMatch[1] : '0';
-            const warnings = warningsMatch ? warningsMatch[1] : '0';
+            const sreCode = '${{ needs.sre-checks.outputs.exit_code }}';
+            const operabilityCode = '${{ needs.operability-checks.outputs.exit_code }}';
+            const observabilityCode = '${{ needs.observability-checks.outputs.exit_code }}';
 
-            const body = `## 📊 Observability Checks: ${status}
+            const sreCritical = parseInt('${{ needs.sre-checks.outputs.critical }}' || '0');
+            const operabilityCritical = parseInt('${{ needs.operability-checks.outputs.critical }}' || '0');
+            const observabilityCritical = parseInt('${{ needs.observability-checks.outputs.critical }}' || '0');
+
+            const sreWarnings = parseInt('${{ needs.sre-checks.outputs.warnings }}' || '0');
+            const operabilityWarnings = parseInt('${{ needs.operability-checks.outputs.warnings }}' || '0');
+            const observabilityWarnings = parseInt('${{ needs.observability-checks.outputs.warnings }}' || '0');
+
+            const totalCritical = sreCritical + operabilityCritical + observabilityCritical;
+            const totalWarnings = sreWarnings + operabilityWarnings + observabilityWarnings;
+
+            const allPassed = sreCode === '0' && operabilityCode === '0' && observabilityCode === '0';
+            const overallStatus = allPassed ? '✅ ALL CHECKS PASSED' : '❌ ISSUES FOUND';
+
+            const sreStatus = sreCode === '0' ? '✅ PASSED' : '❌ ISSUES FOUND';
+            const operabilityStatus = operabilityCode === '0' ? '✅ PASSED' : '❌ ISSUES FOUND';
+            const observabilityStatus = observabilityCode === '0' ? '✅ PASSED' : '❌ ISSUES FOUND';
+
+            const body = `## SRE Standard Checks: ${overallStatus}
 
             **SRE Standards Version**: \`${sreVersion}\`
-            **Summary**: ${critical} critical issue(s), ${warnings} warning(s)
-            **Stack**: Prometheus (metrics) + SUMO Logic (logging)
+            **Summary**: ${totalCritical} critical issue(s), ${totalWarnings} warning(s) across 3 checks
+
+            ### Results by Category
+            - 🔧 **SRE Checks (Reliability & Resilience)**: ${sreStatus} (${sreCritical} critical, ${sreWarnings} warnings)
+            - ⚙️ **Operability**: ${operabilityStatus} (${operabilityCritical} critical, ${operabilityWarnings} warnings)
+            - 📊 **Observability**: ${observabilityStatus} (${observabilityCritical} critical, ${observabilityWarnings} warnings)
+
+            ---
 
             <details>
-            <summary>📄 Click to see detailed results</summary>
+            <summary><strong>🔧 SRE Checks (Reliability & Resilience)</strong></summary>
 
             \`\`\`
-            ${output}
+            ${sreOutput}
+            \`\`\`
+
+            </details>
+
+            <details>
+            <summary><strong>⚙️ Operability Checks</strong></summary>
+
+            \`\`\`
+            ${operabilityOutput}
+            \`\`\`
+
+            </details>
+
+            <details>
+            <summary><strong>📊 Observability Checks</strong></summary>
+
+            Stack: Prometheus (metrics) + SUMO Logic (logging)
+
+            \`\`\`
+            ${observabilityOutput}
             \`\`\`
 
             </details>
@@ -285,7 +279,7 @@ jobs:
 
             const botComment = comments.find(comment =>
               comment.user.type === 'Bot' &&
-              comment.body.includes('Observability Checks')
+              comment.body.includes('SRE Standard Checks:')
             );
 
             if (botComment) {
@@ -295,6 +289,7 @@ jobs:
                 comment_id: botComment.id,
                 body: body
               });
+              console.log('Updated existing PR comment');
             } else {
               await github.rest.issues.createComment({
                 owner: context.repo.owner,
@@ -302,14 +297,6 @@ jobs:
                 issue_number: context.issue.number,
                 body: body
               });
+              console.log('Created new PR comment');
             }
-
-      - name: Check for critical issues
-        if: inputs.fail_on_issues
-        run: |
-          EXIT_CODE="${{ steps.checks.outputs.exit_code }}"
-          if [ "$EXIT_CODE" != "0" ]; then
-            echo "❌ Observability checks failed"
-            exit 1
-          fi
 
