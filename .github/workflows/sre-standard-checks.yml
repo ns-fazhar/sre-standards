@@ -164,6 +164,43 @@ jobs:
             </details>
 
             ---
+
+            ### 💻 Run Checks Locally
+
+            **Before pushing**, catch issues early by running checks on your machine:
+
+            #### Option 1: Interactive with Claude Code
+            \`\`\`bash
+            # One-time setup
+            cd ~/.claude/skills
+            curl -O https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/skills/sre-checks-top5.md
+            curl -O https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/skills/operability-top5.md
+            curl -O https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/skills/observability-top5.md
+            curl -O https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/skills/npi-top5.md
+
+            # Use in your service
+            cd your-service
+            claude code
+            > /sre-checks-top5        # Deep analysis with guided fixes
+            > /operability-top5       # Operability review
+            > /observability-top5     # Observability validation
+            \`\`\`
+
+            #### Option 2: Command-Line Scripts (No Claude Required)
+            \`\`\`bash
+            # Add to your Makefile
+            sre-check-all:
+            	@curl -fsSL https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/generated/check-sre-top5.sh | bash
+            	@curl -fsSL https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/generated/check-operability-top5.sh | bash
+            	@curl -fsSL https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/generated/check-observability-top5.sh | bash
+
+            # Run before committing
+            make sre-check-all
+            \`\`\`
+
+            📖 **Full Guide**: [Local Development Documentation](https://github.com/ns-fazhar/sre-standards#-local-development-guide)
+
+            ---
             🤖 Powered by [sre-standards](https://github.com/${context.repo.owner}/sre-standards) v${sreVersion}
             `;
 
