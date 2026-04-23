@@ -1304,6 +1304,9 @@ npi:
   category_description: "Patterns to validate new features and changes before production release"
   confidence_level: "High (82-99% across patterns)"
   source_document: "SRE NPI Checklists - Design Sign-off"
+  branch_requirement: "feature_branch"
+  branch_compare: "main"
+  usage_note: "NPI checks must be run on feature branches, comparing changes against main branch"
 
   patterns:
     # ========================================

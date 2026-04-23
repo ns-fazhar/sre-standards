@@ -77,6 +77,12 @@ def generate_skill_markdown(category_key: str, patterns_data: Dict, enabled_patt
         print(f"⚠️  No enabled patterns for {category_key}, skipping skill generation")
         return
 
+    # Check if NPI category (branch-based)
+    is_npi = category_key == 'npi'
+    branch_requirement = category_data.get('branch_requirement', None)
+    branch_compare = category_data.get('branch_compare', 'main')
+    usage_note = category_data.get('usage_note', '')
+
     doc = f"""---
 name: {category_info['skill_name']}
 description: {category_info['description']}
@@ -84,7 +90,14 @@ version: {metadata['version']}
 category: top5_{category_key}
 auto-generated: true
 languages: {', '.join(metadata['languages_supported'])}
----
+"""
+
+    if is_npi:
+        doc += f"""branch_requirement: {branch_requirement}
+branch_compare: {branch_compare}
+"""
+
+    doc += f"""---
 
 # SRE Top 5: {category_info['name']}
 
@@ -100,7 +113,42 @@ languages: {', '.join(metadata['languages_supported'])}
 
 This skill checks for the **Top {len(enabled_pattern_data)} most critical patterns** in this category.
 
-## Usage
+"""
+
+    if is_npi:
+        doc += f"""## ⚠️ Branch Requirement
+
+**NPI checks must be run on feature branches**, comparing changes against `{branch_compare}`.
+
+{usage_note}
+
+### Usage Examples
+
+```bash
+# Switch to feature branch
+git checkout feature/new-payment-flow
+
+# Run NPI checks (compares against main)
+./generated/check-npi-top5.sh
+
+# Or specify a different base branch
+BASE_BRANCH=develop ./generated/check-npi-top5.sh
+```
+
+### Why Feature Branches?
+
+NPI (New Product Introduction) checks validate:
+- New code files (not existing code)
+- New database migrations
+- New API endpoints
+- New dependencies
+- New features with feature flags
+
+These checks only make sense when comparing a feature branch against the baseline (main).
+
+"""
+
+    doc += f"""## Usage
 
 When invoked, analyze the codebase and check for the following patterns:
 
@@ -241,13 +289,24 @@ def generate_check_script(category_key: str, patterns_data: Dict, enabled_patter
         print(f"⚠️  No enabled patterns for {category_key}, skipping script generation")
         return
 
+    # Check if this is NPI category (branch-based checks)
+    is_npi = category_key == 'npi'
+    branch_requirement = category_data.get('branch_requirement', None)
+    branch_compare = category_data.get('branch_compare', 'main')
+
     script = f"""#!/bin/bash
 # Auto-generated from sre-top5-patterns.yaml v{metadata['version']}
 # DO NOT EDIT MANUALLY - Regenerate with: make generate
 # Category: {category_info['name']}
 # Patterns: Top {len(enabled_pattern_data)} most critical
 # Languages: {', '.join(metadata['languages_supported'])}
+"""
 
+    if is_npi:
+        script += f"""# Branch Requirement: Feature branch (compares against {branch_compare})
+"""
+
+    script += f"""
 set -e
 
 # Colors
@@ -259,13 +318,79 @@ CYAN='\\033[0;36m'
 BOLD='\\033[1m'
 NC='\\033[0m'
 
+"""
+
+    # Add branch detection for NPI
+    if is_npi:
+        script += f"""# Branch Detection (NPI requires feature branch)
+CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
+BASE_BRANCH="${{BASE_BRANCH:-{branch_compare}}}"
+
 echo -e "${{BOLD}}${{BLUE}}🔍 SRE Top 5: {category_info['name']} (v{metadata['version']})${{NC}}"
 echo -e "${{CYAN}}{category_data['category_description']}${{NC}}"
 echo -e "${{CYAN}}Confidence: {category_data['confidence_level']}${{NC}}"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
+echo -e "${{BOLD}}Branch Context:${{NC}}"
+echo "  Current Branch: ${{CYAN}}$CURRENT_BRANCH${{NC}}"
+echo "  Comparing Against: ${{CYAN}}$BASE_BRANCH${{NC}}"
+echo ""
 
-CRITICAL=0
+# Validate we're on a feature branch
+if [ "$CURRENT_BRANCH" = "{branch_compare}" ] || [ "$CURRENT_BRANCH" = "master" ]; then
+    echo -e "${{YELLOW}}⚠️  WARNING: NPI checks should run on feature branches, not $CURRENT_BRANCH${{NC}}"
+    echo ""
+    echo "Usage: Switch to your feature branch first, or set BASE_BRANCH:"
+    echo "  git checkout feature/my-new-feature"
+    echo "  ./{output_file.name}"
+    echo ""
+    echo "Or specify base branch:"
+    echo "  BASE_BRANCH=main ./{output_file.name}"
+    echo ""
+fi
+
+# Check if base branch exists
+if ! git rev-parse --verify "$BASE_BRANCH" >/dev/null 2>&1; then
+    echo -e "${{RED}}❌ Error: Base branch '$BASE_BRANCH' not found${{NC}}"
+    echo ""
+    echo "Available branches:"
+    git branch -a | head -10
+    exit 1
+fi
+
+echo -e "${{BOLD}}Analyzing changes in this branch:${{NC}}"
+CHANGED_FILES=$(git diff --name-only $BASE_BRANCH..HEAD 2>/dev/null | wc -l | tr -d ' ')
+NEW_FILES=$(git diff --name-only --diff-filter=A $BASE_BRANCH..HEAD 2>/dev/null | wc -l | tr -d ' ')
+MODIFIED_FILES=$(git diff --name-only --diff-filter=M $BASE_BRANCH..HEAD 2>/dev/null | wc -l | tr -d ' ')
+
+echo "  Changed Files: ${{CHANGED_FILES}} (${{NEW_FILES}} new, ${{MODIFIED_FILES}} modified)"
+echo ""
+
+if [ "$CHANGED_FILES" -eq 0 ]; then
+    echo -e "${{YELLOW}}⚠️  No changes detected between $BASE_BRANCH and $CURRENT_BRANCH${{NC}}"
+    echo ""
+    echo "This could mean:"
+    echo "  - You're already on $BASE_BRANCH"
+    echo "  - Your branch is up-to-date with $BASE_BRANCH"
+    echo "  - You need to commit your changes first"
+    echo ""
+    exit 0
+fi
+
+echo -e "${{BOLD}}Running NPI Checks on Changed Files:${{NC}}"
+echo ""
+
+"""
+    else:
+        script += f"""echo -e "${{BOLD}}${{BLUE}}🔍 SRE Top 5: {category_info['name']} (v{metadata['version']})${{NC}}"
+echo -e "${{CYAN}}{category_data['category_description']}${{NC}}"
+echo -e "${{CYAN}}Confidence: {category_data['confidence_level']}${{NC}}"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+
+"""
+
+    script += f"""CRITICAL=0
 WARNINGS=0
 INFO=0
 
@@ -314,9 +439,22 @@ echo ""
 
             file_includes = ' '.join([f'--include="{ft}"' for ft in file_types])
 
+            # For NPI checks, only search in changed files
+            if is_npi:
+                search_target = '$(git diff --name-only $BASE_BRANCH..HEAD)'
+                # Pre-compute file extension regex pattern (avoid backslash in f-string)
+                ext_pattern = '|'.join([ft.replace('*.', '\\.') for ft in file_types])
+            else:
+                search_target = '.'
+                ext_pattern = ''
+
             if invert:
                 # Pattern should NOT be found
-                script += f"""if grep -rq "{pattern_regex}" . {file_includes} 2>/dev/null; then
+                if is_npi:
+                    script += f"""if git diff --name-only $BASE_BRANCH..HEAD | xargs -I {{}} grep -H "{pattern_regex}" {{}} 2>/dev/null | grep -E '({ext_pattern})' >/dev/null 2>&1; then
+"""
+                else:
+                    script += f"""if grep -rq "{pattern_regex}" {search_target} {file_includes} 2>/dev/null; then
 """
                 # Failure - pattern found when it shouldn't be
                 if severity in ['critical', 'blocking']:
@@ -340,11 +478,22 @@ fi
 """
             else:
                 # Pattern SHOULD be found
-                script += f"""if grep -rq "{pattern_regex}" . {file_includes} 2>/dev/null; then
+                if is_npi:
+                    script += f"""if git diff --name-only $BASE_BRANCH..HEAD | xargs -I {{}} grep -H "{pattern_regex}" {{}} 2>/dev/null | grep -E '({ext_pattern})' >/dev/null 2>&1; then
+"""
+                else:
+                    script += f"""if grep -rq "{pattern_regex}" {search_target} {file_includes} 2>/dev/null; then
 """
                 if exclude_pattern:
-                    script += f"""    # Check if exclude pattern also exists (good case)
-    if grep -rq "{exclude_pattern}" . {file_includes} 2>/dev/null; then
+                    if is_npi:
+                        script += f"""    # Check if exclude pattern also exists (good case)
+    if git diff --name-only $BASE_BRANCH..HEAD | xargs -I {{}} grep -H "{exclude_pattern}" {{}} 2>/dev/null | grep -E '({ext_pattern})' >/dev/null 2>&1; then
+        echo -e "${{GREEN}}✓${{NC}}"
+    else
+"""
+                    else:
+                        script += f"""    # Check if exclude pattern also exists (good case)
+    if grep -rq "{exclude_pattern}" {search_target} {file_includes} 2>/dev/null; then
         echo -e "${{GREEN}}✓${{NC}}"
     else
 """

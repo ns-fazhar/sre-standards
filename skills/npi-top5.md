@@ -5,6 +5,8 @@ version: 1.0.0
 category: top5_npi
 auto-generated: true
 languages: python, go, java, scala
+branch_requirement: feature_branch
+branch_compare: main
 ---
 
 # SRE Top 5: NPI (New Product Introduction)
@@ -20,6 +22,36 @@ Patterns to validate new features and changes before production release
 **Confidence Level**: High (82-99% across patterns)
 
 This skill checks for the **Top 5 most critical patterns** in this category.
+
+## ⚠️ Branch Requirement
+
+**NPI checks must be run on feature branches**, comparing changes against `main`.
+
+NPI checks must be run on feature branches, comparing changes against main branch
+
+### Usage Examples
+
+```bash
+# Switch to feature branch
+git checkout feature/new-payment-flow
+
+# Run NPI checks (compares against main)
+./generated/check-npi-top5.sh
+
+# Or specify a different base branch
+BASE_BRANCH=develop ./generated/check-npi-top5.sh
+```
+
+### Why Feature Branches?
+
+NPI (New Product Introduction) checks validate:
+- New code files (not existing code)
+- New database migrations
+- New API endpoints
+- New dependencies
+- New features with feature flags
+
+These checks only make sense when comparing a feature branch against the baseline (main).
 
 ## Usage
 

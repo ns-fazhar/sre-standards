@@ -4,6 +4,7 @@
 # Category: NPI (New Product Introduction)
 # Patterns: Top 5 most critical
 # Languages: python, go, java, scala
+# Branch Requirement: Feature branch (compares against main)
 
 set -e
 
@@ -16,10 +17,62 @@ CYAN='\033[0;36m'
 BOLD='\033[1m'
 NC='\033[0m'
 
+# Branch Detection (NPI requires feature branch)
+CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
+BASE_BRANCH="${BASE_BRANCH:-main}"
+
 echo -e "${BOLD}${BLUE}🔍 SRE Top 5: NPI (New Product Introduction) (v1.0.0)${NC}"
 echo -e "${CYAN}Patterns to validate new features and changes before production release${NC}"
 echo -e "${CYAN}Confidence: High (82-99% across patterns)${NC}"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+echo -e "${BOLD}Branch Context:${NC}"
+echo "  Current Branch: ${CYAN}$CURRENT_BRANCH${NC}"
+echo "  Comparing Against: ${CYAN}$BASE_BRANCH${NC}"
+echo ""
+
+# Validate we're on a feature branch
+if [ "$CURRENT_BRANCH" = "main" ] || [ "$CURRENT_BRANCH" = "master" ]; then
+    echo -e "${YELLOW}⚠️  WARNING: NPI checks should run on feature branches, not $CURRENT_BRANCH${NC}"
+    echo ""
+    echo "Usage: Switch to your feature branch first, or set BASE_BRANCH:"
+    echo "  git checkout feature/my-new-feature"
+    echo "  ./check-npi-top5.sh"
+    echo ""
+    echo "Or specify base branch:"
+    echo "  BASE_BRANCH=main ./check-npi-top5.sh"
+    echo ""
+fi
+
+# Check if base branch exists
+if ! git rev-parse --verify "$BASE_BRANCH" >/dev/null 2>&1; then
+    echo -e "${RED}❌ Error: Base branch '$BASE_BRANCH' not found${NC}"
+    echo ""
+    echo "Available branches:"
+    git branch -a | head -10
+    exit 1
+fi
+
+echo -e "${BOLD}Analyzing changes in this branch:${NC}"
+CHANGED_FILES=$(git diff --name-only $BASE_BRANCH..HEAD 2>/dev/null | wc -l | tr -d ' ')
+NEW_FILES=$(git diff --name-only --diff-filter=A $BASE_BRANCH..HEAD 2>/dev/null | wc -l | tr -d ' ')
+MODIFIED_FILES=$(git diff --name-only --diff-filter=M $BASE_BRANCH..HEAD 2>/dev/null | wc -l | tr -d ' ')
+
+echo "  Changed Files: ${CHANGED_FILES} (${NEW_FILES} new, ${MODIFIED_FILES} modified)"
+echo ""
+
+if [ "$CHANGED_FILES" -eq 0 ]; then
+    echo -e "${YELLOW}⚠️  No changes detected between $BASE_BRANCH and $CURRENT_BRANCH${NC}"
+    echo ""
+    echo "This could mean:"
+    echo "  - You're already on $BASE_BRANCH"
+    echo "  - Your branch is up-to-date with $BASE_BRANCH"
+    echo "  - You need to commit your changes first"
+    echo ""
+    exit 0
+fi
+
+echo -e "${BOLD}Running NPI Checks on Changed Files:${NC}"
 echo ""
 
 CRITICAL=0
@@ -33,7 +86,7 @@ INFO=0
 # ========================================
 echo -n "[1/5] Checking SQL Injection Prevention... "
 
-if grep -rq "(execute|executemany)\s*\([^)]*(%s|%d|\+|f\"|f'|\.format)" . --include="*.py" 2>/dev/null; then
+if git diff --name-only $BASE_BRANCH..HEAD | xargs -I {} grep -H "(execute|executemany)\s*\([^)]*(%s|%d|\+|f\"|f'|\.format)" {} 2>/dev/null | grep -E '(\.py)' >/dev/null 2>&1; then
     echo -e "${GREEN}✓${NC}"
 else
     echo -e "${RED}✗${NC}"
@@ -50,9 +103,9 @@ fi
 # ========================================
 echo -n "[2/5] Checking Feature Flag for New Features... "
 
-if grep -rq "@app\.route\(|@router\.(get|post|put|delete)" . --include="*.py" 2>/dev/null; then
+if git diff --name-only $BASE_BRANCH..HEAD | xargs -I {} grep -H "@app\.route\(|@router\.(get|post|put|delete)" {} 2>/dev/null | grep -E '(\.py)' >/dev/null 2>&1; then
     # Check if exclude pattern also exists (good case)
-    if grep -rq "feature_flag|FeatureFlag|flag_enabled|LaunchDarkly" . --include="*.py" 2>/dev/null; then
+    if git diff --name-only $BASE_BRANCH..HEAD | xargs -I {} grep -H "feature_flag|FeatureFlag|flag_enabled|LaunchDarkly" {} 2>/dev/null | grep -E '(\.py)' >/dev/null 2>&1; then
         echo -e "${GREEN}✓${NC}"
     else
     echo -e "${YELLOW}⚠${NC}"
@@ -77,7 +130,7 @@ echo -n "[3/5] Checking Database Schema Changes with Migration... "
 # ========================================
 echo -n "[4/5] Checking API Breaking Changes Detection... "
 
-if grep -rq "DROP\s+TABLE|DROP\s+COLUMN|RENAME\s+COLUMN" . --include="*.sql" --include="*/migrations/*" 2>/dev/null; then
+if git diff --name-only $BASE_BRANCH..HEAD | xargs -I {} grep -H "DROP\s+TABLE|DROP\s+COLUMN|RENAME\s+COLUMN" {} 2>/dev/null | grep -E '(\.sql|*/migrations/*)' >/dev/null 2>&1; then
     echo -e "${GREEN}✓${NC}"
 else
     echo -e "${YELLOW}⚠${NC}"
