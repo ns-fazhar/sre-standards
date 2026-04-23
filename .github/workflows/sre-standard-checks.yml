@@ -41,7 +41,7 @@ jobs:
         continue-on-error: true
         run: |
           echo "🔧 Running SRE Checks (Reliability & Resilience)..."
-          .sre-standards/generated/check-sre-top5.sh 2>&1 | tee sre-output.txt
+          .sre-standards/generated/check-sre.sh 2>&1 | tee sre-output.txt
           SRE_EXIT=${PIPESTATUS[0]}
 
           SRE_CRITICAL=$(grep -oP '\d+(?= critical)' sre-output.txt | head -1 || echo "0")
@@ -57,7 +57,7 @@ jobs:
         run: |
           echo ""
           echo "⚙️  Running Operability Checks..."
-          .sre-standards/generated/check-operability-top5.sh 2>&1 | tee operability-output.txt
+          .sre-standards/generated/check-operability.sh 2>&1 | tee operability-output.txt
           OPS_EXIT=${PIPESTATUS[0]}
 
           OPS_CRITICAL=$(grep -oP '\d+(?= critical)' operability-output.txt | head -1 || echo "0")
@@ -73,7 +73,7 @@ jobs:
         run: |
           echo ""
           echo "📊 Running Observability Checks..."
-          .sre-standards/generated/check-observability-top5.sh 2>&1 | tee observability-output.txt
+          .sre-standards/generated/check-observability.sh 2>&1 | tee observability-output.txt
           OBS_EXIT=${PIPESTATUS[0]}
 
           OBS_CRITICAL=$(grep -oP '\d+(?= critical)' observability-output.txt | head -1 || echo "0")
@@ -182,26 +182,26 @@ jobs:
             \`\`\`bash
             # One-time setup
             cd ~/.claude/skills
-            curl -O https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/skills/sre-checks-top5.md
-            curl -O https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/skills/operability-top5.md
-            curl -O https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/skills/observability-top5.md
-            curl -O https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/skills/npi-top5.md
+            curl -O https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/skills/sre-checks.md
+            curl -O https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/skills/operability.md
+            curl -O https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/skills/observability.md
+            curl -O https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/skills/npi.md
 
             # Use in your service
             cd your-service
             claude code
-            > /sre-checks-top5        # Deep analysis with guided fixes
-            > /operability-top5       # Operability review
-            > /observability-top5     # Observability validation
+            > /sre-checks        # Deep analysis with guided fixes
+            > /operability       # Operability review
+            > /observability     # Observability validation
             \`\`\`
 
             #### Option 2: Command-Line Scripts (No Claude Required)
             \`\`\`bash
             # Add to your Makefile
             sre-check-all:
-            	@curl -fsSL https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/generated/check-sre-top5.sh | bash
-            	@curl -fsSL https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/generated/check-operability-top5.sh | bash
-            	@curl -fsSL https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/generated/check-observability-top5.sh | bash
+            	@curl -fsSL https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/generated/check-sre.sh | bash
+            	@curl -fsSL https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/generated/check-operability.sh | bash
+            	@curl -fsSL https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/generated/check-observability.sh | bash
 
             # Run before committing
             make sre-check-all

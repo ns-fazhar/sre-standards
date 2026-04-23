@@ -105,7 +105,7 @@ jobs:
           path: .sre-standards
           ref: main
       - name: Run NPI checks
-        run: .sre-standards/generated/check-npi-top5.sh
+        run: .sre-standards/generated/check-npi.sh
 ```
 
 #### Step 3: Commit and Push
@@ -150,15 +150,15 @@ sre-standards/
 ├── mappings/
 │   └── sre-top5-patterns.yaml       ← SINGLE SOURCE OF TRUTH
 ├── generated/                       ← Auto-generated (don't edit)
-│   ├── check-sre-top5.sh
-│   ├── check-operability-top5.sh
-│   ├── check-observability-top5.sh
-│   └── check-npi-top5.sh
+│   ├── check-sre.sh
+│   ├── check-operability.sh
+│   ├── check-observability.sh
+│   └── check-npi.sh
 ├── skills/                          ← Auto-generated (don't edit)
-│   ├── sre-checks-top5.md
-│   ├── operability-top5.md
-│   ├── observability-top5.md
-│   └── npi-top5.md
+│   ├── sre-checks.md
+│   ├── operability.md
+│   ├── observability.md
+│   └── npi.md
 ├── .github/workflows/               ← Reusable workflows
 │   ├── sre-standard-checks.yml      ← Services reference this @main
 │   └── npi-checks-manual.yml        ← Template for services
@@ -211,14 +211,14 @@ make generate
 
 Output:
 ```
-✅ Generated generated/check-sre-top5.sh
-✅ Generated generated/check-operability-top5.sh
-✅ Generated generated/check-observability-top5.sh
-✅ Generated generated/check-npi-top5.sh
-✅ Generated skills/sre-checks-top5.md
-✅ Generated skills/operability-top5.md
-✅ Generated skills/observability-top5.md
-✅ Generated skills/npi-top5.md
+✅ Generated generated/check-sre.sh
+✅ Generated generated/check-operability.sh
+✅ Generated generated/check-observability.sh
+✅ Generated generated/check-npi.sh
+✅ Generated skills/sre-checks.md
+✅ Generated skills/operability.md
+✅ Generated skills/observability.md
+✅ Generated skills/npi.md
 ```
 
 #### 3. Test Locally
@@ -351,10 +351,10 @@ brew install --cask claude
 
 # Add skills to your local Claude
 cd ~/.claude/skills
-curl -O https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/skills/sre-checks-top5.md
-curl -O https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/skills/operability-top5.md
-curl -O https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/skills/observability-top5.md
-curl -O https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/skills/npi-top5.md
+curl -O https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/skills/sre-checks.md
+curl -O https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/skills/operability.md
+curl -O https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/skills/observability.md
+curl -O https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/skills/npi.md
 ```
 
 #### Daily Usage
@@ -366,10 +366,10 @@ cd your-service
 claude code
 
 # In Claude, run interactive checks:
-> /sre-checks-top5        # Deep SRE reliability analysis
-> /operability-top5       # Operability review
-> /observability-top5     # Observability validation
-> /npi-top5              # NPI feature validation (feature branches)
+> /sre-checks        # Deep SRE reliability analysis
+> /operability       # Operability review
+> /observability     # Observability validation
+> /npi              # NPI feature validation (feature branches)
 ```
 
 **What you get:**
@@ -380,7 +380,7 @@ claude code
 
 **Example interaction:**
 ```
-You: /operability-top5
+You: /operability
 
 Claude: Running Operability checks on your service...
 
@@ -426,18 +426,18 @@ sre-check-all:
 	@echo "🔍 Running ALL SRE Standard Checks..."
 	@echo ""
 	@echo "Running SRE Checks (Reliability)..."
-	@curl -fsSL https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/generated/check-sre-top5.sh | bash
+	@curl -fsSL https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/generated/check-sre.sh | bash
 	@echo ""
 	@echo "Running Operability Checks..."
-	@curl -fsSL https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/generated/check-operability-top5.sh | bash
+	@curl -fsSL https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/generated/check-operability.sh | bash
 	@echo ""
 	@echo "Running Observability Checks..."
-	@curl -fsSL https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/generated/check-observability-top5.sh | bash
+	@curl -fsSL https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/generated/check-observability.sh | bash
 	@echo ""
 	@CURRENT_BRANCH=$$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown"); \
 	if [ "$$CURRENT_BRANCH" != "main" ] && [ "$$CURRENT_BRANCH" != "master" ]; then \
 		echo "Running NPI Checks (feature branch detected)..."; \
-		curl -fsSL https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/generated/check-npi-top5.sh | bash; \
+		curl -fsSL https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/generated/check-npi.sh | bash; \
 	else \
 		echo "⏭️  Skipping NPI checks (not on feature branch)"; \
 	fi
@@ -445,15 +445,15 @@ sre-check-all:
 # Individual checks
 sre-check:
 	@echo "🔧 Running SRE Checks (Reliability & Resilience)..."
-	@curl -fsSL https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/generated/check-sre-top5.sh | bash
+	@curl -fsSL https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/generated/check-sre.sh | bash
 
 operability-check:
 	@echo "⚙️  Running Operability Checks..."
-	@curl -fsSL https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/generated/check-operability-top5.sh | bash
+	@curl -fsSL https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/generated/check-operability.sh | bash
 
 observability-check:
 	@echo "📊 Running Observability Checks..."
-	@curl -fsSL https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/generated/check-observability-top5.sh | bash
+	@curl -fsSL https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/generated/check-observability.sh | bash
 
 npi-check:
 	@echo "🚀 Running NPI Checks (New Product Introduction)..."
@@ -462,7 +462,7 @@ npi-check:
 		echo "❌ Error: NPI checks must run on feature branches, not $$CURRENT_BRANCH"; \
 		exit 1; \
 	fi
-	@curl -fsSL https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/generated/check-npi-top5.sh | bash
+	@curl -fsSL https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/generated/check-npi.sh | bash
 ```
 
 #### Daily Usage
@@ -523,15 +523,15 @@ Found 2 critical issue(s), 1 warning(s), and 0 info item(s).
 
 ```bash
 # One-liner for all checks
-curl -fsSL https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/generated/check-sre-top5.sh | bash && \
-curl -fsSL https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/generated/check-operability-top5.sh | bash && \
-curl -fsSL https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/generated/check-observability-top5.sh | bash
+curl -fsSL https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/generated/check-sre.sh | bash && \
+curl -fsSL https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/generated/check-operability.sh | bash && \
+curl -fsSL https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/generated/check-observability.sh | bash
 
 # Individual checks
-curl -fsSL https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/generated/check-sre-top5.sh | bash
-curl -fsSL https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/generated/check-operability-top5.sh | bash
-curl -fsSL https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/generated/check-observability-top5.sh | bash
-curl -fsSL https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/generated/check-npi-top5.sh | bash
+curl -fsSL https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/generated/check-sre.sh | bash
+curl -fsSL https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/generated/check-operability.sh | bash
+curl -fsSL https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/generated/check-observability.sh | bash
+curl -fsSL https://raw.githubusercontent.com/ns-fazhar/sre-standards/main/generated/check-npi.sh | bash
 ```
 
 
