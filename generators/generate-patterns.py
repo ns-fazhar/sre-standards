@@ -435,9 +435,17 @@ echo ""
             exclude_pattern = first_rule.get('exclude', '')
             if exclude_pattern:
                 exclude_pattern = exclude_pattern.replace('"', '\\"').replace('$', '\\$')
+            require_after = first_rule.get('require_after', '')
+            if require_after:
+                require_after = require_after.replace('"', '\\"').replace('$', '\\$')
             invert = first_rule.get('invert', False)
 
             file_includes = ' '.join([f'--include="{ft}"' for ft in file_types])
+
+            # Add -E flag if pattern contains regex operators
+            grep_flags = '-rHn'
+            if '|' in pattern_regex or '(' in pattern_regex or '+' in pattern_regex or '?' in pattern_regex:
+                grep_flags = '-rHnE'
 
             # For NPI checks, only search in changed files
             if is_npi:
@@ -451,11 +459,11 @@ echo ""
             if invert:
                 # Pattern should NOT be found
                 if is_npi:
-                    script += f"""MATCHES=$(git diff --name-only $BASE_BRANCH..HEAD | xargs -I {{}} grep -Hn "{pattern_regex}" {{}} 2>/dev/null | grep -E '({ext_pattern})' || true)
+                    script += f"""MATCHES=$(git diff --name-only $BASE_BRANCH..HEAD | xargs -I {{}} grep {grep_flags.replace('-r', '')} "{pattern_regex}" {{}} 2>/dev/null | grep -E '({ext_pattern})' || true)
 if [ -n "$MATCHES" ]; then
 """
                 else:
-                    script += f"""MATCHES=$(grep -rHn "{pattern_regex}" {search_target} {file_includes} 2>/dev/null || true)
+                    script += f"""MATCHES=$(grep {grep_flags} "{pattern_regex}" {search_target} {file_includes} 2>/dev/null || true)
 if [ -n "$MATCHES" ]; then
 """
                 # Failure - pattern found when it shouldn't be
@@ -491,29 +499,38 @@ fi
             else:
                 # Pattern SHOULD be found
                 if is_npi:
-                    script += f"""MATCHES=$(git diff --name-only $BASE_BRANCH..HEAD | xargs -I {{}} grep -Hn "{pattern_regex}" {{}} 2>/dev/null | grep -E '({ext_pattern})' || true)
+                    script += f"""MATCHES=$(git diff --name-only $BASE_BRANCH..HEAD | xargs -I {{}} grep {grep_flags.replace('-r', '')} "{pattern_regex}" {{}} 2>/dev/null | grep -E '({ext_pattern})' || true)
 if [ -n "$MATCHES" ]; then
 """
                 else:
-                    script += f"""MATCHES=$(grep -rHn "{pattern_regex}" {search_target} {file_includes} 2>/dev/null || true)
+                    script += f"""MATCHES=$(grep {grep_flags} "{pattern_regex}" {search_target} {file_includes} 2>/dev/null || true)
 if [ -n "$MATCHES" ]; then
 """
-                if exclude_pattern:
+                if exclude_pattern or require_after:
+                    check_pattern = require_after if require_after else exclude_pattern
+                    check_type = "require_after" if require_after else "exclude"
+
                     if is_npi:
-                        script += f"""    # Check if exclude pattern also exists (good case)
-    EXCLUDES=$(echo "$MATCHES" | while IFS=: read -r file line content; do
-        grep -q "{exclude_pattern}" "$file" 2>/dev/null && echo "$file:$line:$content"
+                        script += f"""    # Check if {check_type} pattern also exists (good case)
+    GOOD_MATCHES=$(echo "$MATCHES" | while IFS=: read -r file line content; do
+        grep -q "{check_pattern}" "$file" 2>/dev/null && echo "$file:$line:$content"
     done)
-    if [ -n "$EXCLUDES" ]; then
+    BAD_MATCHES=$(echo "$MATCHES" | while IFS=: read -r file line content; do
+        grep -q "{check_pattern}" "$file" 2>/dev/null || echo "$file:$line:$content"
+    done)
+    if [ -z "$BAD_MATCHES" ]; then
         echo -e "${{GREEN}}✓${{NC}}"
     else
 """
                     else:
-                        script += f"""    # Check if exclude pattern also exists (good case)
-    EXCLUDES=$(echo "$MATCHES" | while IFS=: read -r file line content; do
-        grep -q "{exclude_pattern}" "$file" 2>/dev/null && echo "$file:$line:$content"
+                        script += f"""    # Check if {check_type} pattern also exists (good case)
+    GOOD_MATCHES=$(echo "$MATCHES" | while IFS=: read -r file line content; do
+        grep -q "{check_pattern}" "$file" 2>/dev/null && echo "$file:$line:$content"
     done)
-    if [ -n "$EXCLUDES" ]; then
+    BAD_MATCHES=$(echo "$MATCHES" | while IFS=: read -r file line content; do
+        grep -q "{check_pattern}" "$file" 2>/dev/null || echo "$file:$line:$content"
+    done)
+    if [ -z "$BAD_MATCHES" ]; then
         echo -e "${{GREEN}}✓${{NC}}"
     else
 """
@@ -529,9 +546,9 @@ else
     echo "     Fix: {fix_msg}"
     echo ""
 """
-                    if exclude_pattern:
+                    if exclude_pattern or require_after:
                         script += f"""    echo "     Files missing proper implementation:"
-    echo "$MATCHES" | while IFS=: read -r file line content; do
+    echo "$BAD_MATCHES" | while IFS=: read -r file line content; do
         echo "       - ${{CYAN}}$file:$line${{NC}} → ${{RED}}$(echo "$content" | xargs)${{NC}}"
     done
     echo ""
@@ -544,9 +561,9 @@ else
     echo "     Fix: {fix_msg}"
     echo ""
 """
-                    if exclude_pattern:
+                    if exclude_pattern or require_after:
                         script += f"""    echo "     Files missing proper implementation:"
-    echo "$MATCHES" | while IFS=: read -r file line content; do
+    echo "$BAD_MATCHES" | while IFS=: read -r file line content; do
         echo "       - ${{CYAN}}$file:$line${{NC}} → ${{YELLOW}}$(echo "$content" | xargs)${{NC}}"
     done
     echo ""
@@ -561,7 +578,7 @@ else
     INFO=$((INFO + 1))
 """
 
-                if exclude_pattern:
+                if exclude_pattern or require_after:
                     script += """    fi
 """
                 script += """fi

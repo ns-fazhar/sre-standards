@@ -86,7 +86,7 @@ INFO=0
 # ========================================
 echo -n "[1/5] Checking SQL Injection Prevention... "
 
-MATCHES=$(git diff --name-only $BASE_BRANCH..HEAD | xargs -I {} grep -Hn "(execute|executemany)\s*\([^)]*(%s|%d|\+|f\"|f'|\.format)" {} 2>/dev/null | grep -E '(\.py)' || true)
+MATCHES=$(git diff --name-only $BASE_BRANCH..HEAD | xargs -I {} grep HnE "(execute|executemany)\s*\([^)]*(%s|%d|\+|f\"|f'|\.format)" {} 2>/dev/null | grep -E '(\.py)' || true)
 if [ -n "$MATCHES" ]; then
     echo -e "${GREEN}✓${NC}"
 else
@@ -104,13 +104,16 @@ fi
 # ========================================
 echo -n "[2/5] Checking Feature Flag for New Features... "
 
-MATCHES=$(git diff --name-only $BASE_BRANCH..HEAD | xargs -I {} grep -Hn "@app\.route\(|@router\.(get|post|put|delete)" {} 2>/dev/null | grep -E '(\.py)' || true)
+MATCHES=$(git diff --name-only $BASE_BRANCH..HEAD | xargs -I {} grep HnE "@app\.route\(|@router\.(get|post|put|delete)" {} 2>/dev/null | grep -E '(\.py)' || true)
 if [ -n "$MATCHES" ]; then
     # Check if exclude pattern also exists (good case)
-    EXCLUDES=$(echo "$MATCHES" | while IFS=: read -r file line content; do
+    GOOD_MATCHES=$(echo "$MATCHES" | while IFS=: read -r file line content; do
         grep -q "feature_flag|FeatureFlag|flag_enabled|LaunchDarkly" "$file" 2>/dev/null && echo "$file:$line:$content"
     done)
-    if [ -n "$EXCLUDES" ]; then
+    BAD_MATCHES=$(echo "$MATCHES" | while IFS=: read -r file line content; do
+        grep -q "feature_flag|FeatureFlag|flag_enabled|LaunchDarkly" "$file" 2>/dev/null || echo "$file:$line:$content"
+    done)
+    if [ -z "$BAD_MATCHES" ]; then
         echo -e "${GREEN}✓${NC}"
     else
     echo -e "${YELLOW}⚠${NC}"
@@ -118,7 +121,7 @@ if [ -n "$MATCHES" ]; then
     echo "     Fix: Wrap new features in feature flags (LaunchDarkly, Unleash, Togglz)"
     echo ""
     echo "     Files missing proper implementation:"
-    echo "$MATCHES" | while IFS=: read -r file line content; do
+    echo "$BAD_MATCHES" | while IFS=: read -r file line content; do
         echo "       - ${CYAN}$file:$line${NC} → ${YELLOW}$(echo "$content" | xargs)${NC}"
     done
     echo ""
@@ -140,7 +143,7 @@ echo -n "[3/5] Checking Database Schema Changes with Migration... "
 # ========================================
 echo -n "[4/5] Checking API Breaking Changes Detection... "
 
-MATCHES=$(git diff --name-only $BASE_BRANCH..HEAD | xargs -I {} grep -Hn "DROP\s+TABLE|DROP\s+COLUMN|RENAME\s+COLUMN" {} 2>/dev/null | grep -E '(\.sql|*/migrations/*)' || true)
+MATCHES=$(git diff --name-only $BASE_BRANCH..HEAD | xargs -I {} grep HnE "DROP\s+TABLE|DROP\s+COLUMN|RENAME\s+COLUMN" {} 2>/dev/null | grep -E '(\.sql|*/migrations/*)' || true)
 if [ -n "$MATCHES" ]; then
     echo -e "${GREEN}✓${NC}"
 else

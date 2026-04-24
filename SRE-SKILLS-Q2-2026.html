@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>SRE Standards - Q2 2026 Project</title>
+</head>
+<body>
+
+<h1>SRE Standards - Q2 2026 Project</h1>
+
+<p><strong>Owner:</strong> SRE Team<br>
+<strong>Date:</strong> April 2026</p>
+
+<hr>
+
+<h2>Use Case</h2>
+
+<p>Developers commit code without knowing they're missing critical reliability, observability, and operational patterns - these gaps surface during reviews or production incidents. SRE Standards provides pre-commit feedback via automated skills that scan code and identify what's missing before commit, eliminating costly late discovery and embedding SRE expertise directly into development workflow.</p>
+
+<hr>
+
+<h2>Q2 2026 Acceptance Criteria</h2>
+
+<p>Develop <strong>4 production-ready skill categories</strong>:</p>
+
+<ul>
+<li><strong>SRE Checks</strong> - Scan for reliability/resilience patterns (circuit breakers, retries, timeouts)</li>
+<li><strong>Operability</strong> - Dataflow validations, generate runbooks/playbooks for troubleshooting</li>
+<li><strong>Observability</strong> - Scan for metrics instrumentation, suggest dashboards and alerts</li>
+<li><strong>NPI</strong> - New feature introduction, validate branch-based feature releases</li>
+</ul>
+
+<p>Skills invoked via Claude Code (<code>/skill-name</code>) in local developer environment or GitHub Actions on PR, with bash scripts as fallback when Claude unavailable.</p>
+
+<p><strong>Success:</strong> Complete skill development, pilot with 2-3 services to validate effectiveness and gather feedback, then sell program across organization for broader adoption.</p>
+
+<table border="1" cellpadding="15" cellspacing="0" width="100%" bgcolor="#e7f3ff">
+<tr>
+<td>
+<strong>Note:</strong> Skills invoked from local developer environment (during coding) or GitHub Actions (on PR) - immediate feedback before code commit.
+</td>
+</tr>
+</table>
+
+<br>
+
+<table border="1" cellpadding="15" cellspacing="0" width="100%" bgcolor="#fff3cd">
+<tr>
+<td>
+<strong>PRR Automation Path:</strong> With these skills in place, they will partially cover Production Readiness Review (PRR) requirements by automatically validating reliability, observability, and operational patterns. Q3 2026 goal is to evaluate whether we can automate most of the PRR data collection process, reducing manual PRR overhead.
+</td>
+</tr>
+</table>
+
+<hr>
+
+<h2>Reference Implementation</h2>
+
+<p><strong>Repository Links:</strong></p>
+
+<table border="1" cellpadding="10" cellspacing="0" width="100%">
+<tr>
+<td width="30%"><strong>SRE Standards (Central Repo)</strong></td>
+<td width="70%"><a href="https://github.com/ns-fazhar/sre-standards">https://github.com/ns-fazhar/sre-standards</a><br>
+Central source of truth for all SRE skills, check patterns, and reusable workflows</td>
+</tr>
+<tr>
+<td><strong>Payment Service (Sample App)</strong></td>
+<td><a href="https://github.com/ns-fazhar/payment-service">https://github.com/ns-fazhar/payment-service</a><br>
+Reference implementation showing how services integrate SRE Standards via GitHub Actions</td>
+</tr>
+</table>
+
+<p><em>See these repositories for PoC implementation details and integration patterns.</em></p>
+
+</body>
+</html>

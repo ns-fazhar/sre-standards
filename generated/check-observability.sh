@@ -33,13 +33,16 @@ INFO=0
 # ========================================
 echo -n "[1/5] Checking Prometheus Metrics Instrumentation... "
 
-MATCHES=$(grep -rHn "@app\.route\(|@router\.(get|post|put|delete)" . --include="*.py" 2>/dev/null || true)
+MATCHES=$(grep -rHnE "@app\.route\(|@router\.(get|post|put|delete)" . --include="*.py" 2>/dev/null || true)
 if [ -n "$MATCHES" ]; then
     # Check if exclude pattern also exists (good case)
-    EXCLUDES=$(echo "$MATCHES" | while IFS=: read -r file line content; do
+    GOOD_MATCHES=$(echo "$MATCHES" | while IFS=: read -r file line content; do
         grep -q "\.inc\(\)|\.observe\(\)|prometheus|@metrics" "$file" 2>/dev/null && echo "$file:$line:$content"
     done)
-    if [ -n "$EXCLUDES" ]; then
+    BAD_MATCHES=$(echo "$MATCHES" | while IFS=: read -r file line content; do
+        grep -q "\.inc\(\)|\.observe\(\)|prometheus|@metrics" "$file" 2>/dev/null || echo "$file:$line:$content"
+    done)
+    if [ -z "$BAD_MATCHES" ]; then
         echo -e "${GREEN}✓${NC}"
     else
     echo -e "${YELLOW}⚠${NC}"
@@ -47,7 +50,7 @@ if [ -n "$MATCHES" ]; then
     echo "     Fix: Add Prometheus counters and histograms to all critical paths"
     echo ""
     echo "     Files missing proper implementation:"
-    echo "$MATCHES" | while IFS=: read -r file line content; do
+    echo "$BAD_MATCHES" | while IFS=: read -r file line content; do
         echo "       - ${CYAN}$file:$line${NC} → ${YELLOW}$(echo "$content" | xargs)${NC}"
     done
     echo ""
@@ -85,13 +88,16 @@ fi
 # ========================================
 echo -n "[3/5] Checking Central Error Logging... "
 
-MATCHES=$(grep -rHn "raise\s+\w+Error|return.*Exception" . --include="*.py" 2>/dev/null || true)
+MATCHES=$(grep -rHnE "raise\s+\w+Error|return.*Exception" . --include="*.py" 2>/dev/null || true)
 if [ -n "$MATCHES" ]; then
     # Check if exclude pattern also exists (good case)
-    EXCLUDES=$(echo "$MATCHES" | while IFS=: read -r file line content; do
+    GOOD_MATCHES=$(echo "$MATCHES" | while IFS=: read -r file line content; do
         grep -q "log\.|logger\.|logging\." "$file" 2>/dev/null && echo "$file:$line:$content"
     done)
-    if [ -n "$EXCLUDES" ]; then
+    BAD_MATCHES=$(echo "$MATCHES" | while IFS=: read -r file line content; do
+        grep -q "log\.|logger\.|logging\." "$file" 2>/dev/null || echo "$file:$line:$content"
+    done)
+    if [ -z "$BAD_MATCHES" ]; then
         echo -e "${GREEN}✓${NC}"
     else
     echo -e "${YELLOW}⚠${NC}"
@@ -99,7 +105,7 @@ if [ -n "$MATCHES" ]; then
     echo "     Fix: Add structured logging for all error paths (automatically sent to SUMO Logic)"
     echo ""
     echo "     Files missing proper implementation:"
-    echo "$MATCHES" | while IFS=: read -r file line content; do
+    echo "$BAD_MATCHES" | while IFS=: read -r file line content; do
         echo "       - ${CYAN}$file:$line${NC} → ${YELLOW}$(echo "$content" | xargs)${NC}"
     done
     echo ""
@@ -114,13 +120,16 @@ fi
 # ========================================
 echo -n "[4/5] Checking Request Duration Tracking... "
 
-MATCHES=$(grep -rHn "@app\.route\(" . --include="*.py" 2>/dev/null || true)
+MATCHES=$(grep -rHnE "@app\.route\(" . --include="*.py" 2>/dev/null || true)
 if [ -n "$MATCHES" ]; then
     # Check if exclude pattern also exists (good case)
-    EXCLUDES=$(echo "$MATCHES" | while IFS=: read -r file line content; do
+    GOOD_MATCHES=$(echo "$MATCHES" | while IFS=: read -r file line content; do
         grep -q "Histogram|\.observe\(|\.time\(\)" "$file" 2>/dev/null && echo "$file:$line:$content"
     done)
-    if [ -n "$EXCLUDES" ]; then
+    BAD_MATCHES=$(echo "$MATCHES" | while IFS=: read -r file line content; do
+        grep -q "Histogram|\.observe\(|\.time\(\)" "$file" 2>/dev/null || echo "$file:$line:$content"
+    done)
+    if [ -z "$BAD_MATCHES" ]; then
         echo -e "${GREEN}✓${NC}"
     else
     echo -e "${YELLOW}⚠${NC}"
@@ -128,7 +137,7 @@ if [ -n "$MATCHES" ]; then
     echo "     Fix: Add Prometheus Histogram to track request duration"
     echo ""
     echo "     Files missing proper implementation:"
-    echo "$MATCHES" | while IFS=: read -r file line content; do
+    echo "$BAD_MATCHES" | while IFS=: read -r file line content; do
         echo "       - ${CYAN}$file:$line${NC} → ${YELLOW}$(echo "$content" | xargs)${NC}"
     done
     echo ""
@@ -143,13 +152,16 @@ fi
 # ========================================
 echo -n "[5/5] Checking Request ID Propagation... "
 
-MATCHES=$(grep -rHn "requests\.(get|post|put|delete)" . --include="*.py" 2>/dev/null || true)
+MATCHES=$(grep -rHnE "requests\.(get|post|put|delete)" . --include="*.py" 2>/dev/null || true)
 if [ -n "$MATCHES" ]; then
     # Check if exclude pattern also exists (good case)
-    EXCLUDES=$(echo "$MATCHES" | while IFS=: read -r file line content; do
+    GOOD_MATCHES=$(echo "$MATCHES" | while IFS=: read -r file line content; do
         grep -q "X-Request-ID|request_id|correlation_id|trace_id" "$file" 2>/dev/null && echo "$file:$line:$content"
     done)
-    if [ -n "$EXCLUDES" ]; then
+    BAD_MATCHES=$(echo "$MATCHES" | while IFS=: read -r file line content; do
+        grep -q "X-Request-ID|request_id|correlation_id|trace_id" "$file" 2>/dev/null || echo "$file:$line:$content"
+    done)
+    if [ -z "$BAD_MATCHES" ]; then
         echo -e "${GREEN}✓${NC}"
     else
     echo -e "${CYAN}ℹ${NC}"

@@ -33,7 +33,7 @@ INFO=0
 # ========================================
 echo -n "[1/5] Checking No Hardcoded Secrets... "
 
-MATCHES=$(grep -rHn "(password|api_key|secret|token|aws_access_key|private_key)\s*=\s*['\"]([a-zA-Z0-9+/=]{20,})['\"]" . --include="*.py" --include="*.go" --include="*.js" --include="*.java" --include="*.scala" --include="*.yaml" --include="*.yml" 2>/dev/null || true)
+MATCHES=$(grep -rHnE "(password|api_key|secret|token|aws_access_key|private_key)\s*=\s*['\"]([a-zA-Z0-9+/=]{20,})['\"]" . --include="*.py" --include="*.go" --include="*.js" --include="*.java" --include="*.scala" --include="*.yaml" --include="*.yml" 2>/dev/null || true)
 if [ -n "$MATCHES" ]; then
     echo -e "${GREEN}✓${NC}"
 else
@@ -51,13 +51,16 @@ fi
 # ========================================
 echo -n "[2/5] Checking Graceful Shutdown... "
 
-MATCHES=$(grep -rHn "func main\(\)" . --include="*.go" 2>/dev/null || true)
+MATCHES=$(grep -rHnE "func main\(\)" . --include="*.go" 2>/dev/null || true)
 if [ -n "$MATCHES" ]; then
     # Check if exclude pattern also exists (good case)
-    EXCLUDES=$(echo "$MATCHES" | while IFS=: read -r file line content; do
+    GOOD_MATCHES=$(echo "$MATCHES" | while IFS=: read -r file line content; do
         grep -q "signal\.Notify|syscall\.SIGTERM|syscall\.SIGINT" "$file" 2>/dev/null && echo "$file:$line:$content"
     done)
-    if [ -n "$EXCLUDES" ]; then
+    BAD_MATCHES=$(echo "$MATCHES" | while IFS=: read -r file line content; do
+        grep -q "signal\.Notify|syscall\.SIGTERM|syscall\.SIGINT" "$file" 2>/dev/null || echo "$file:$line:$content"
+    done)
+    if [ -z "$BAD_MATCHES" ]; then
         echo -e "${GREEN}✓${NC}"
     else
     echo -e "${YELLOW}⚠${NC}"
@@ -65,7 +68,7 @@ if [ -n "$MATCHES" ]; then
     echo "     Fix: Implement signal handlers to gracefully drain connections before shutdown"
     echo ""
     echo "     Files missing proper implementation:"
-    echo "$MATCHES" | while IFS=: read -r file line content; do
+    echo "$BAD_MATCHES" | while IFS=: read -r file line content; do
         echo "       - ${CYAN}$file:$line${NC} → ${YELLOW}$(echo "$content" | xargs)${NC}"
     done
     echo ""
@@ -80,7 +83,7 @@ fi
 # ========================================
 echo -n "[3/5] Checking Environment Variables Documented... "
 
-MATCHES=$(grep -rHn "os\.getenv\(|os\.environ\[|os\.environ\.get\(" . --include="*.py" 2>/dev/null || true)
+MATCHES=$(grep -rHnE "os\.getenv\(|os\.environ\[|os\.environ\.get\(" . --include="*.py" 2>/dev/null || true)
 if [ -n "$MATCHES" ]; then
     echo -e "${GREEN}✓${NC}"
 else
@@ -114,13 +117,16 @@ fi
 # ========================================
 echo -n "[5/5] Checking Configuration Validation... "
 
-MATCHES=$(grep -rHn "yaml\.load\(|json\.load\(|configparser\." . --include="*.py" 2>/dev/null || true)
+MATCHES=$(grep -rHnE "yaml\.load\(|json\.load\(|configparser\." . --include="*.py" 2>/dev/null || true)
 if [ -n "$MATCHES" ]; then
     # Check if exclude pattern also exists (good case)
-    EXCLUDES=$(echo "$MATCHES" | while IFS=: read -r file line content; do
+    GOOD_MATCHES=$(echo "$MATCHES" | while IFS=: read -r file line content; do
         grep -q "validate|schema|pydantic|marshmallow" "$file" 2>/dev/null && echo "$file:$line:$content"
     done)
-    if [ -n "$EXCLUDES" ]; then
+    BAD_MATCHES=$(echo "$MATCHES" | while IFS=: read -r file line content; do
+        grep -q "validate|schema|pydantic|marshmallow" "$file" 2>/dev/null || echo "$file:$line:$content"
+    done)
+    if [ -z "$BAD_MATCHES" ]; then
         echo -e "${GREEN}✓${NC}"
     else
     echo -e "${CYAN}ℹ${NC}"
