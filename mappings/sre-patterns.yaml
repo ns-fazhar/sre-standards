@@ -264,7 +264,7 @@ sre_checks:
       detection:
         # Go - HTTP response body not closed
         - language: go
-          pattern: '\.Get\(|\.Post\(|\.Do\('
+          pattern: 'http\.(Get|Post|Head|Do)\(|client\.(Get|Post|Do)\('
           require_after: 'defer.*\.Body\.Close\(\)'
           file_types: ["*.go"]
           message: "HTTP response body not closed with defer"
@@ -432,7 +432,6 @@ sre_checks:
         - language: all
           pattern: '/health|/ready|/readiness|/healthz|/livez'
           file_types: ["*.py", "*.go", "*.js", "*.java", "*.scala"]
-          invert: true
           message: "No health or readiness endpoint found"
 
       guidance:

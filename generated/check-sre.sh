@@ -36,12 +36,12 @@ echo -n "[1/5] Checking HTTP Timeout Protection... "
 MATCHES=$(grep -rHnE "requests\.(get|post|put|delete|patch)\([^)]*\)" . --include="*.py" 2>/dev/null || true)
 if [ -n "$MATCHES" ]; then
     # Check if exclude pattern also exists (good case)
-    GOOD_MATCHES=$(echo "$MATCHES" | while IFS=: read -r file line content; do
-        grep -q "timeout\s*=" "$file" 2>/dev/null && echo "$file:$line:$content"
-    done)
-    BAD_MATCHES=$(echo "$MATCHES" | while IFS=: read -r file line content; do
-        grep -q "timeout\s*=" "$file" 2>/dev/null || echo "$file:$line:$content"
-    done)
+    BAD_MATCHES=""
+    while IFS=: read -r file line content; do
+        if ! grep -q "timeout\s*=" "$file" 2>/dev/null; then
+            BAD_MATCHES="${BAD_MATCHES}$file:$line:$content"$'\n'
+        fi
+    done <<< "$MATCHES"
     if [ -z "$BAD_MATCHES" ]; then
         echo -e "${GREEN}✓${NC}"
     else
@@ -50,9 +50,10 @@ if [ -n "$MATCHES" ]; then
     echo "     Fix: Add timeout parameter to all HTTP calls"
     echo ""
     echo "     Files missing proper implementation:"
-    echo "$BAD_MATCHES" | while IFS=: read -r file line content; do
+    while IFS=: read -r file line content; do
+        [ -z "$file" ] && continue
         echo "       - ${CYAN}$file:$line${NC} → ${RED}$(echo "$content" | xargs)${NC}"
-    done
+    done <<< "$BAD_MATCHES"
     echo ""
     CRITICAL=$((CRITICAL + 1))
     fi
@@ -68,12 +69,12 @@ echo -n "[2/5] Checking Circuit Breaker for External Services... "
 MATCHES=$(grep -rHnE "requests\.(get|post)" . --include="*.py" 2>/dev/null || true)
 if [ -n "$MATCHES" ]; then
     # Check if exclude pattern also exists (good case)
-    GOOD_MATCHES=$(echo "$MATCHES" | while IFS=: read -r file line content; do
-        grep -q "CircuitBreaker|pybreaker" "$file" 2>/dev/null && echo "$file:$line:$content"
-    done)
-    BAD_MATCHES=$(echo "$MATCHES" | while IFS=: read -r file line content; do
-        grep -q "CircuitBreaker|pybreaker" "$file" 2>/dev/null || echo "$file:$line:$content"
-    done)
+    BAD_MATCHES=""
+    while IFS=: read -r file line content; do
+        if ! grep -q "CircuitBreaker|pybreaker" "$file" 2>/dev/null; then
+            BAD_MATCHES="${BAD_MATCHES}$file:$line:$content"$'\n'
+        fi
+    done <<< "$MATCHES"
     if [ -z "$BAD_MATCHES" ]; then
         echo -e "${GREEN}✓${NC}"
     else
@@ -82,9 +83,10 @@ if [ -n "$MATCHES" ]; then
     echo "     Fix: Wrap external service calls with circuit breaker library"
     echo ""
     echo "     Files missing proper implementation:"
-    echo "$BAD_MATCHES" | while IFS=: read -r file line content; do
+    while IFS=: read -r file line content; do
+        [ -z "$file" ] && continue
         echo "       - ${CYAN}$file:$line${NC} → ${RED}$(echo "$content" | xargs)${NC}"
-    done
+    done <<< "$BAD_MATCHES"
     echo ""
     CRITICAL=$((CRITICAL + 1))
     fi
@@ -97,15 +99,15 @@ fi
 # ========================================
 echo -n "[3/5] Checking Resource Leak Prevention... "
 
-MATCHES=$(grep -rHnE "\.Get\(|\.Post\(|\.Do\(" . --include="*.go" 2>/dev/null || true)
+MATCHES=$(grep -rHnE "http\.(Get|Post|Head|Do)\(|client\.(Get|Post|Do)\(" . --include="*.go" 2>/dev/null || true)
 if [ -n "$MATCHES" ]; then
     # Check if require_after pattern also exists (good case)
-    GOOD_MATCHES=$(echo "$MATCHES" | while IFS=: read -r file line content; do
-        grep -q "defer.*\.Body\.Close\(\)" "$file" 2>/dev/null && echo "$file:$line:$content"
-    done)
-    BAD_MATCHES=$(echo "$MATCHES" | while IFS=: read -r file line content; do
-        grep -q "defer.*\.Body\.Close\(\)" "$file" 2>/dev/null || echo "$file:$line:$content"
-    done)
+    BAD_MATCHES=""
+    while IFS=: read -r file line content; do
+        if ! grep -q "defer.*\.Body\.Close\(\)" "$file" 2>/dev/null; then
+            BAD_MATCHES="${BAD_MATCHES}$file:$line:$content"$'\n'
+        fi
+    done <<< "$MATCHES"
     if [ -z "$BAD_MATCHES" ]; then
         echo -e "${GREEN}✓${NC}"
     else
@@ -114,9 +116,10 @@ if [ -n "$MATCHES" ]; then
     echo "     Fix: Use defer (Go), context managers (Python), try-with-resources (Java)"
     echo ""
     echo "     Files missing proper implementation:"
-    echo "$BAD_MATCHES" | while IFS=: read -r file line content; do
+    while IFS=: read -r file line content; do
+        [ -z "$file" ] && continue
         echo "       - ${CYAN}$file:$line${NC} → ${YELLOW}$(echo "$content" | xargs)${NC}"
-    done
+    done <<< "$BAD_MATCHES"
     echo ""
     WARNINGS=$((WARNINGS + 1))
     fi
@@ -132,12 +135,12 @@ echo -n "[4/5] Checking Retry Logic with Exponential Backoff... "
 MATCHES=$(grep -rHnE "requests\.(get|post|put|delete)" . --include="*.py" 2>/dev/null || true)
 if [ -n "$MATCHES" ]; then
     # Check if exclude pattern also exists (good case)
-    GOOD_MATCHES=$(echo "$MATCHES" | while IFS=: read -r file line content; do
-        grep -q "@retry|tenacity|backoff" "$file" 2>/dev/null && echo "$file:$line:$content"
-    done)
-    BAD_MATCHES=$(echo "$MATCHES" | while IFS=: read -r file line content; do
-        grep -q "@retry|tenacity|backoff" "$file" 2>/dev/null || echo "$file:$line:$content"
-    done)
+    BAD_MATCHES=""
+    while IFS=: read -r file line content; do
+        if ! grep -q "@retry|tenacity|backoff" "$file" 2>/dev/null; then
+            BAD_MATCHES="${BAD_MATCHES}$file:$line:$content"$'\n'
+        fi
+    done <<< "$MATCHES"
     if [ -z "$BAD_MATCHES" ]; then
         echo -e "${GREEN}✓${NC}"
     else
@@ -146,9 +149,10 @@ if [ -n "$MATCHES" ]; then
     echo "     Fix: Implement retry with exponential backoff and jitter"
     echo ""
     echo "     Files missing proper implementation:"
-    echo "$BAD_MATCHES" | while IFS=: read -r file line content; do
+    while IFS=: read -r file line content; do
+        [ -z "$file" ] && continue
         echo "       - ${CYAN}$file:$line${NC} → ${YELLOW}$(echo "$content" | xargs)${NC}"
-    done
+    done <<< "$BAD_MATCHES"
     echo ""
     WARNINGS=$((WARNINGS + 1))
     fi
@@ -163,18 +167,13 @@ echo -n "[5/5] Checking Health & Readiness Endpoints... "
 
 MATCHES=$(grep -rHnE "/health|/ready|/readiness|/healthz|/livez" . --include="*.py" --include="*.go" --include="*.js" --include="*.java" --include="*.scala" 2>/dev/null || true)
 if [ -n "$MATCHES" ]; then
+    echo -e "${GREEN}✓${NC}"
+else
     echo -e "${YELLOW}⚠${NC}"
     echo "  🟡 WARNING: Service must expose /health and /ready endpoints for Kubernetes probes"
     echo "     Fix: Add /health (liveness) and /ready (readiness) endpoints"
     echo ""
-    echo "     Violations found:"
-    echo "$MATCHES" | while IFS=: read -r file line content; do
-        echo "       - ${CYAN}$file:$line${NC} → ${YELLOW}$(echo "$content" | xargs)${NC}"
-    done
-    echo ""
     WARNINGS=$((WARNINGS + 1))
-else
-    echo -e "${GREEN}✓${NC}"
 fi
 
 

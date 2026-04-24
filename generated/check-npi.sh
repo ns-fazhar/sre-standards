@@ -107,12 +107,12 @@ echo -n "[2/5] Checking Feature Flag for New Features... "
 MATCHES=$(git diff --name-only $BASE_BRANCH..HEAD | xargs -I {} grep HnE "@app\.route\(|@router\.(get|post|put|delete)" {} 2>/dev/null | grep -E '(\.py)' || true)
 if [ -n "$MATCHES" ]; then
     # Check if exclude pattern also exists (good case)
-    GOOD_MATCHES=$(echo "$MATCHES" | while IFS=: read -r file line content; do
-        grep -q "feature_flag|FeatureFlag|flag_enabled|LaunchDarkly" "$file" 2>/dev/null && echo "$file:$line:$content"
-    done)
-    BAD_MATCHES=$(echo "$MATCHES" | while IFS=: read -r file line content; do
-        grep -q "feature_flag|FeatureFlag|flag_enabled|LaunchDarkly" "$file" 2>/dev/null || echo "$file:$line:$content"
-    done)
+    BAD_MATCHES=""
+    while IFS=: read -r file line content; do
+        if ! grep -q "feature_flag|FeatureFlag|flag_enabled|LaunchDarkly" "$file" 2>/dev/null; then
+            BAD_MATCHES="${BAD_MATCHES}$file:$line:$content"$'\n'
+        fi
+    done <<< "$MATCHES"
     if [ -z "$BAD_MATCHES" ]; then
         echo -e "${GREEN}✓${NC}"
     else
@@ -121,9 +121,10 @@ if [ -n "$MATCHES" ]; then
     echo "     Fix: Wrap new features in feature flags (LaunchDarkly, Unleash, Togglz)"
     echo ""
     echo "     Files missing proper implementation:"
-    echo "$BAD_MATCHES" | while IFS=: read -r file line content; do
+    while IFS=: read -r file line content; do
+        [ -z "$file" ] && continue
         echo "       - ${CYAN}$file:$line${NC} → ${YELLOW}$(echo "$content" | xargs)${NC}"
-    done
+    done <<< "$BAD_MATCHES"
     echo ""
     WARNINGS=$((WARNINGS + 1))
     fi
