@@ -523,12 +523,14 @@ operability:
         - language: all
           pattern: "(password|api_key|secret|token|aws_access_key|private_key)\\s*=\\s*['\"]([a-zA-Z0-9+/=]{20,})['\"]"
           file_types: ["*.py", "*.go", "*.js", "*.java", "*.scala", "*.yaml", "*.yml"]
+          invert: true
           message: "Potential hardcoded secret detected"
 
         # Common secret patterns
         - language: all
           pattern: "sk_live_|pk_live_|ghp_|gho_|AKIA[0-9A-Z]{16}"
           file_types: ["*.py", "*.go", "*.js", "*.java", "*.scala"]
+          invert: true
           message: "API key pattern detected (Stripe, GitHub, AWS)"
 
       guidance:

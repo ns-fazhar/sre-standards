@@ -35,13 +35,19 @@ echo -n "[1/5] Checking No Hardcoded Secrets... "
 
 MATCHES=$(grep -rHnE "(password|api_key|secret|token|aws_access_key|private_key)\s*=\s*['\"]([a-zA-Z0-9+/=]{20,})['\"]" . --include="*.py" --include="*.go" --include="*.js" --include="*.java" --include="*.scala" --include="*.yaml" --include="*.yml" 2>/dev/null || true)
 if [ -n "$MATCHES" ]; then
-    echo -e "${GREEN}✓${NC}"
-else
     echo -e "${RED}✗${NC}"
     echo "  🔴 CRITICAL: Never hardcode secrets, passwords, or API keys in source code"
     echo "     Fix: Use environment variables or secret management systems (Vault, AWS Secrets Manager)"
     echo ""
+    echo "     Violations found:"
+    while IFS=: read -r file line content; do
+        [ -z "$file" ] && continue
+        echo "       - ${CYAN}$file:$line${NC} → ${RED}$(echo "$content" | xargs)${NC}"
+    done <<< "$MATCHES"
+    echo ""
     CRITICAL=$((CRITICAL + 1))
+else
+    echo -e "${GREEN}✓${NC}"
 fi
 
 # ========================================
