@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Generate skills and scripts from SRE Top 5 pattern YAML files
-Processes the consolidated sre-top5-patterns.yaml file
+Generate skills and scripts from SRE pattern YAML files
+Processes the consolidated sre-patterns.yaml file
 """
 
 import yaml
@@ -9,30 +9,30 @@ import sys
 from pathlib import Path
 from typing import Dict, List
 
-TOP5_CATEGORIES = {
+CATEGORIES = {
     'sre_checks': {
         'name': 'SRE Checks (Reliability & Resilience)',
-        'skill_name': 'sre-checks-top5',
-        'script_name': 'check-sre-top5.sh',
-        'description': 'Top 5 reliability and resilience patterns - prevent outages'
+        'skill_name': 'sre-checks',
+        'script_name': 'check-sre.sh',
+        'description': 'Critical reliability and resilience patterns - prevent outages'
     },
     'operability': {
         'name': 'Operability',
-        'skill_name': 'operability-top5',
-        'script_name': 'check-operability-top5.sh',
-        'description': 'Top 5 operability patterns - ensure maintainable services'
+        'skill_name': 'operability',
+        'script_name': 'check-operability.sh',
+        'description': 'Critical operability patterns - ensure maintainable services'
     },
     'observability': {
         'name': 'Observability',
-        'skill_name': 'observability-top5',
-        'script_name': 'check-observability-top5.sh',
-        'description': 'Top 5 observability patterns - visibility into service health'
+        'skill_name': 'observability',
+        'script_name': 'check-observability.sh',
+        'description': 'Critical observability patterns - visibility into service health'
     },
     'npi': {
         'name': 'NPI (New Product Introduction)',
-        'skill_name': 'npi-top5',
-        'script_name': 'check-npi-top5.sh',
-        'description': 'Top 5 NPI patterns - validate new features safely'
+        'skill_name': 'npi',
+        'script_name': 'check-npi.sh',
+        'description': 'Critical NPI patterns - validate new features safely'
     }
 }
 
@@ -41,20 +41,20 @@ def load_yaml(file_path: Path) -> Dict:
     with open(file_path, 'r') as f:
         return yaml.safe_load(f)
 
-def load_top5_patterns(base_dir: Path) -> Dict:
-    """Load Top 5 pattern definitions"""
-    pattern_file = base_dir / 'mappings' / 'sre-top5-patterns.yaml'
+def load_critical_patterns(base_dir: Path) -> Dict:
+    """Load Critical pattern definitions"""
+    pattern_file = base_dir / 'mappings' / 'sre-patterns.yaml'
     if not pattern_file.exists():
         print(f"❌ Error: {pattern_file} not found")
         sys.exit(1)
     return load_yaml(pattern_file)
 
-def load_enabled_top5(base_dir: Path) -> Dict:
-    """Load enabled Top 5 patterns configuration"""
+def load_enabled_critical(base_dir: Path) -> Dict:
+    """Load enabled Critical patterns configuration"""
     enabled_file = base_dir / 'mappings' / 'enabled-patterns.yaml'
     config = load_yaml(enabled_file)
 
-    # Extract Top 5 sections
+    # Extract Critical sections
     return {
         'sre_checks': config.get('sre_checks', []),
         'operability': config.get('operability', []),
@@ -63,9 +63,9 @@ def load_enabled_top5(base_dir: Path) -> Dict:
     }
 
 def generate_skill_markdown(category_key: str, patterns_data: Dict, enabled_patterns: List[str], output_file: Path):
-    """Generate Claude skill markdown for Top 5 category"""
+    """Generate Claude skill markdown for Critical category"""
 
-    category_info = TOP5_CATEGORIES[category_key]
+    category_info = CATEGORIES[category_key]
     metadata = patterns_data['metadata']
     category_data = patterns_data[category_key]
     all_patterns = category_data['patterns']
@@ -87,7 +87,7 @@ def generate_skill_markdown(category_key: str, patterns_data: Dict, enabled_patt
 name: {category_info['skill_name']}
 description: {category_info['description']}
 version: {metadata['version']}
-category: top5_{category_key}
+category: critical_{category_key}
 auto-generated: true
 languages: {', '.join(metadata['languages_supported'])}
 """
@@ -99,7 +99,7 @@ branch_compare: {branch_compare}
 
     doc += f"""---
 
-# SRE Top 5: {category_info['name']}
+# SRE Critical: {category_info['name']}
 
 **Version**: {metadata['version']}
 **Last Updated**: {metadata['last_updated']}
@@ -111,7 +111,7 @@ branch_compare: {branch_compare}
 
 **Confidence Level**: {category_data['confidence_level']}
 
-This skill checks for the **Top {len(enabled_pattern_data)} most critical patterns** in this category.
+This skill checks for **{len(enabled_pattern_data)} critical patterns** in this category.
 
 """
 
@@ -129,10 +129,10 @@ This skill checks for the **Top {len(enabled_pattern_data)} most critical patter
 git checkout feature/new-payment-flow
 
 # Run NPI checks (compares against main)
-./generated/check-npi-top5.sh
+./generated/check-npi-critical.sh
 
 # Or specify a different base branch
-BASE_BRANCH=develop ./generated/check-npi-top5.sh
+BASE_BRANCH=develop ./generated/check-npi-critical.sh
 ```
 
 ### Why Feature Branches?
@@ -220,7 +220,7 @@ List any info severity findings
 ## Example Output
 
 ```
-🔍 SRE Top 5: {category_info['name']} Results
+🔍 SRE Critical: {category_info['name']} Results
 
 ✅ SUMMARY
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -260,7 +260,7 @@ Status: ⚠️  WARN - 1 critical issue, 2 warnings found
 
 ## Notes
 
-- This skill is auto-generated from `mappings/sre-top5-patterns.yaml`
+- This skill is auto-generated from `mappings/sre-patterns.yaml`
 - Enabled patterns controlled by `mappings/enabled-patterns.yaml`
 - To update: modify YAML and run `make generate`
 - Multi-language support: Python, Go, Java, Scala
@@ -275,9 +275,9 @@ Status: ⚠️  WARN - 1 critical issue, 2 warnings found
     print(f"✅ Generated skill: {output_file.name}")
 
 def generate_check_script(category_key: str, patterns_data: Dict, enabled_patterns: List[str], output_file: Path):
-    """Generate bash check script for Top 5 category"""
+    """Generate bash check script for Critical category"""
 
-    category_info = TOP5_CATEGORIES[category_key]
+    category_info = CATEGORIES[category_key]
     metadata = patterns_data['metadata']
     category_data = patterns_data[category_key]
     all_patterns = category_data['patterns']
@@ -295,10 +295,10 @@ def generate_check_script(category_key: str, patterns_data: Dict, enabled_patter
     branch_compare = category_data.get('branch_compare', 'main')
 
     script = f"""#!/bin/bash
-# Auto-generated from sre-top5-patterns.yaml v{metadata['version']}
+# Auto-generated from sre-patterns.yaml v{metadata['version']}
 # DO NOT EDIT MANUALLY - Regenerate with: make generate
 # Category: {category_info['name']}
-# Patterns: Top {len(enabled_pattern_data)} most critical
+# Patterns: {len(enabled_pattern_data)} critical checks
 # Languages: {', '.join(metadata['languages_supported'])}
 """
 
@@ -326,7 +326,7 @@ NC='\\033[0m'
 CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
 BASE_BRANCH="${{BASE_BRANCH:-{branch_compare}}}"
 
-echo -e "${{BOLD}}${{BLUE}}🔍 SRE Top 5: {category_info['name']} (v{metadata['version']})${{NC}}"
+echo -e "${{BOLD}}${{BLUE}}🔍 SRE Critical: {category_info['name']} (v{metadata['version']})${{NC}}"
 echo -e "${{CYAN}}{category_data['category_description']}${{NC}}"
 echo -e "${{CYAN}}Confidence: {category_data['confidence_level']}${{NC}}"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -382,7 +382,7 @@ echo ""
 
 """
     else:
-        script += f"""echo -e "${{BOLD}}${{BLUE}}🔍 SRE Top 5: {category_info['name']} (v{metadata['version']})${{NC}}"
+        script += f"""echo -e "${{BOLD}}${{BLUE}}🔍 SRE Critical: {category_info['name']} (v{metadata['version']})${{NC}}"
 echo -e "${{CYAN}}{category_data['category_description']}${{NC}}"
 echo -e "${{CYAN}}Confidence: {category_data['confidence_level']}${{NC}}"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -451,10 +451,12 @@ echo ""
             if invert:
                 # Pattern should NOT be found
                 if is_npi:
-                    script += f"""if git diff --name-only $BASE_BRANCH..HEAD | xargs -I {{}} grep -H "{pattern_regex}" {{}} 2>/dev/null | grep -E '({ext_pattern})' >/dev/null 2>&1; then
+                    script += f"""MATCHES=$(git diff --name-only $BASE_BRANCH..HEAD | xargs -I {{}} grep -Hn "{pattern_regex}" {{}} 2>/dev/null | grep -E '({ext_pattern})' || true)
+if [ -n "$MATCHES" ]; then
 """
                 else:
-                    script += f"""if grep -rq "{pattern_regex}" {search_target} {file_includes} 2>/dev/null; then
+                    script += f"""MATCHES=$(grep -rHn "{pattern_regex}" {search_target} {file_includes} 2>/dev/null || true)
+if [ -n "$MATCHES" ]; then
 """
                 # Failure - pattern found when it shouldn't be
                 if severity in ['critical', 'blocking']:
@@ -462,12 +464,22 @@ echo ""
     echo "  🔴 {severity.upper()}: {description}"
     echo "     Fix: {fix_msg}"
     echo ""
+    echo "     Violations found:"
+    echo "$MATCHES" | while IFS=: read -r file line content; do
+        echo "       - ${{CYAN}}$file:$line${{NC}} → ${{RED}}$(echo "$content" | xargs)${{NC}}"
+    done
+    echo ""
     CRITICAL=$((CRITICAL + 1))
 """
                 else:
                     script += f"""    echo -e "${{YELLOW}}⚠${{NC}}"
     echo "  🟡 WARNING: {description}"
     echo "     Fix: {fix_msg}"
+    echo ""
+    echo "     Violations found:"
+    echo "$MATCHES" | while IFS=: read -r file line content; do
+        echo "       - ${{CYAN}}$file:$line${{NC}} → ${{YELLOW}}$(echo "$content" | xargs)${{NC}}"
+    done
     echo ""
     WARNINGS=$((WARNINGS + 1))
 """
@@ -479,21 +491,29 @@ fi
             else:
                 # Pattern SHOULD be found
                 if is_npi:
-                    script += f"""if git diff --name-only $BASE_BRANCH..HEAD | xargs -I {{}} grep -H "{pattern_regex}" {{}} 2>/dev/null | grep -E '({ext_pattern})' >/dev/null 2>&1; then
+                    script += f"""MATCHES=$(git diff --name-only $BASE_BRANCH..HEAD | xargs -I {{}} grep -Hn "{pattern_regex}" {{}} 2>/dev/null | grep -E '({ext_pattern})' || true)
+if [ -n "$MATCHES" ]; then
 """
                 else:
-                    script += f"""if grep -rq "{pattern_regex}" {search_target} {file_includes} 2>/dev/null; then
+                    script += f"""MATCHES=$(grep -rHn "{pattern_regex}" {search_target} {file_includes} 2>/dev/null || true)
+if [ -n "$MATCHES" ]; then
 """
                 if exclude_pattern:
                     if is_npi:
                         script += f"""    # Check if exclude pattern also exists (good case)
-    if git diff --name-only $BASE_BRANCH..HEAD | xargs -I {{}} grep -H "{exclude_pattern}" {{}} 2>/dev/null | grep -E '({ext_pattern})' >/dev/null 2>&1; then
+    EXCLUDES=$(echo "$MATCHES" | while IFS=: read -r file line content; do
+        grep -q "{exclude_pattern}" "$file" 2>/dev/null && echo "$file:$line:$content"
+    done)
+    if [ -n "$EXCLUDES" ]; then
         echo -e "${{GREEN}}✓${{NC}}"
     else
 """
                     else:
                         script += f"""    # Check if exclude pattern also exists (good case)
-    if grep -rq "{exclude_pattern}" {search_target} {file_includes} 2>/dev/null; then
+    EXCLUDES=$(echo "$MATCHES" | while IFS=: read -r file line content; do
+        grep -q "{exclude_pattern}" "$file" 2>/dev/null && echo "$file:$line:$content"
+    done)
+    if [ -n "$EXCLUDES" ]; then
         echo -e "${{GREEN}}✓${{NC}}"
     else
 """
@@ -502,20 +522,36 @@ fi
 else
 """
 
-                # Failure case - pattern not found
+                # Failure case - pattern not found or exclude pattern missing
                 if severity in ['critical', 'blocking']:
                     script += f"""    echo -e "${{RED}}✗${{NC}}"
     echo "  🔴 {severity.upper()}: {description}"
     echo "     Fix: {fix_msg}"
     echo ""
-    CRITICAL=$((CRITICAL + 1))
+"""
+                    if exclude_pattern:
+                        script += f"""    echo "     Files missing proper implementation:"
+    echo "$MATCHES" | while IFS=: read -r file line content; do
+        echo "       - ${{CYAN}}$file:$line${{NC}} → ${{RED}}$(echo "$content" | xargs)${{NC}}"
+    done
+    echo ""
+"""
+                    script += f"""    CRITICAL=$((CRITICAL + 1))
 """
                 elif severity == 'warning':
                     script += f"""    echo -e "${{YELLOW}}⚠${{NC}}"
     echo "  🟡 WARNING: {description}"
     echo "     Fix: {fix_msg}"
     echo ""
-    WARNINGS=$((WARNINGS + 1))
+"""
+                    if exclude_pattern:
+                        script += f"""    echo "     Files missing proper implementation:"
+    echo "$MATCHES" | while IFS=: read -r file line content; do
+        echo "       - ${{CYAN}}$file:$line${{NC}} → ${{YELLOW}}$(echo "$content" | xargs)${{NC}}"
+    done
+    echo ""
+"""
+                    script += f"""    WARNINGS=$((WARNINGS + 1))
 """
                 else:  # info
                     script += f"""    echo -e "${{CYAN}}ℹ${{NC}}"
@@ -574,7 +610,7 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo ""
 
 if [ $CRITICAL -eq 0 ] && [ $WARNINGS -eq 0 ] && [ $INFO -eq 0 ]; then
-    echo -e "${{GREEN}}${{BOLD}}✅ ALL TOP {len(enabled_pattern_data)} CHECKS PASSED!${{NC}}"
+    echo -e "${{GREEN}}${{BOLD}}✅ ALL {len(enabled_pattern_data)} CHECKS PASSED!${{NC}}"
     echo ""
     exit 0
 elif [ $CRITICAL -eq 0 ] && [ $WARNINGS -eq 0 ]; then
@@ -612,16 +648,16 @@ fi
 def main():
     base_dir = Path(__file__).parent.parent
 
-    # Load Top 5 pattern definitions
-    patterns_data = load_top5_patterns(base_dir)
+    # Load Critical pattern definitions
+    patterns_data = load_critical_patterns(base_dir)
 
     # Load enabled patterns
-    enabled_config = load_enabled_top5(base_dir)
+    enabled_config = load_enabled_critical(base_dir)
 
-    print(f"🔄 Generating Top 5 skills and scripts...\n")
+    print(f"🔄 Generating skills and scripts...\n")
 
     # Process each category
-    for category_key, category_info in TOP5_CATEGORIES.items():
+    for category_key, category_info in CATEGORIES.items():
         print(f"📦 Processing {category_info['name']}...")
 
         # Get enabled patterns for this category
@@ -642,10 +678,10 @@ def main():
 
         print("")
 
-    print(f"✅ All Top 5 files generated successfully!")
+    print(f"✅ All files generated successfully!")
     print(f"\n📁 Output:")
-    print(f"   Skills: skills/*-top5.md")
-    print(f"   Scripts: generated/check-*-top5.sh")
+    print(f"   Skills: skills/*.md")
+    print(f"   Scripts: generated/check-*.sh")
 
 if __name__ == '__main__':
     main()

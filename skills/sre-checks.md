@@ -1,17 +1,17 @@
 ---
-name: sre-checks-top5
-description: Top 5 reliability and resilience patterns - prevent outages
+name: sre-checks
+description: Critical reliability and resilience patterns - prevent outages
 version: 1.0.0
-category: top5_sre_checks
+category: critical_sre_checks
 auto-generated: true
-languages: python, go, java, scala
+languages: python, go, java, scala, javascript, typescript
 ---
 
-# SRE Top 5: SRE Checks (Reliability & Resilience)
+# SRE Critical: SRE Checks (Reliability & Resilience)
 
 **Version**: 1.0.0
-**Last Updated**: 2026-04-23
-**Languages**: python, go, java, scala
+**Last Updated**: 2026-04-24
+**Languages**: python, go, java, scala, javascript, typescript
 
 ## Purpose
 
@@ -19,7 +19,7 @@ Critical patterns to prevent outages and ensure resilient service behavior
 
 **Confidence Level**: High (85-95% across patterns)
 
-This skill checks for the **Top 5 most critical patterns** in this category.
+This skill checks for **5 critical patterns** in this category.
 
 ## Usage
 
@@ -84,11 +84,37 @@ val request = basicRequest
   .readTimeout(10.seconds)
   .response(asString)
 
+# Node.js - axios
+// ❌ BAD - No timeout
+const response = await axios.get(url);
+
+// ✅ GOOD - With timeout
+const response = await axios.get(url, {
+  timeout: 10000  // 10 seconds
+});
+
+# Node.js - fetch with AbortController
+// ❌ BAD - No timeout
+const response = await fetch(url);
+
+// ✅ GOOD - With AbortSignal timeout
+const controller = new AbortController();
+const timeoutId = setTimeout(() => controller.abort(), 10000);
+const response = await fetch(url, { signal: controller.signal });
+clearTimeout(timeoutId);
+
+// ✅ BETTER - Using AbortSignal.timeout (Node.js 17.3+)
+const response = await fetch(url, {
+  signal: AbortSignal.timeout(10000)
+});
+
 ```
 
 **References**:
 - https://requests.readthedocs.io/en/latest/user/advanced/#timeouts
 - https://pkg.go.dev/net/http#Client
+- https://axios-http.com/docs/req_config
+- https://developer.mozilla.org/en-US/docs/Web/API/AbortSignal/timeout
 
 ---
 
@@ -163,12 +189,29 @@ val breaker = new CircuitBreaker(
 
 breaker.withCircuitBreaker(callPaymentGateway(data))
 
+# Node.js - opossum circuit breaker
+const CircuitBreaker = require('opossum');
+
+const options = {
+  timeout: 10000,        // 10 second timeout
+  errorThresholdPercentage: 50,  // Open circuit at 50% failure rate
+  resetTimeout: 30000    // Try again after 30 seconds
+};
+
+const breaker = new CircuitBreaker(callPaymentGateway, options);
+
+// Use the circuit breaker
+breaker.fire(data)
+  .then(result => console.log(result))
+  .catch(err => console.error('Circuit breaker prevented call or call failed'));
+
 ```
 
 **References**:
 - https://martinfowler.com/bliki/CircuitBreaker.html
 - https://github.com/sony/gobreaker
 - https://resilience4j.readme.io/docs/circuitbreaker
+- https://nodeshift.dev/opossum/
 
 ---
 
@@ -421,7 +464,7 @@ List any info severity findings
 ## Example Output
 
 ```
-🔍 SRE Top 5: SRE Checks (Reliability & Resilience) Results
+🔍 SRE Critical: SRE Checks (Reliability & Resilience) Results
 
 ✅ SUMMARY
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -461,7 +504,7 @@ Status: ⚠️  WARN - 1 critical issue, 2 warnings found
 
 ## Notes
 
-- This skill is auto-generated from `mappings/sre-top5-patterns.yaml`
+- This skill is auto-generated from `mappings/sre-patterns.yaml`
 - Enabled patterns controlled by `mappings/enabled-patterns.yaml`
 - To update: modify YAML and run `make generate`
 - Multi-language support: Python, Go, Java, Scala

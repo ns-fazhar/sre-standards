@@ -1,9 +1,9 @@
 #!/bin/bash
-# Auto-generated from sre-top5-patterns.yaml v1.0.0
+# Auto-generated from sre-patterns.yaml v1.0.0
 # DO NOT EDIT MANUALLY - Regenerate with: make generate
 # Category: Observability
-# Patterns: Top 5 most critical
-# Languages: python, go, java, scala
+# Patterns: 5 critical checks
+# Languages: python, go, java, scala, javascript, typescript
 
 set -e
 
@@ -16,7 +16,7 @@ CYAN='\033[0;36m'
 BOLD='\033[1m'
 NC='\033[0m'
 
-echo -e "${BOLD}${BLUE}🔍 SRE Top 5: Observability (v1.0.0)${NC}"
+echo -e "${BOLD}${BLUE}🔍 SRE Critical: Observability (v1.0.0)${NC}"
 echo -e "${CYAN}Patterns to ensure visibility into service health and performance${NC}"
 echo -e "${CYAN}Confidence: High (80-92% across patterns)${NC}"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -33,14 +33,23 @@ INFO=0
 # ========================================
 echo -n "[1/5] Checking Prometheus Metrics Instrumentation... "
 
-if grep -rq "@app\.route\(|@router\.(get|post|put|delete)" . --include="*.py" 2>/dev/null; then
+MATCHES=$(grep -rHn "@app\.route\(|@router\.(get|post|put|delete)" . --include="*.py" 2>/dev/null || true)
+if [ -n "$MATCHES" ]; then
     # Check if exclude pattern also exists (good case)
-    if grep -rq "\.inc\(\)|\.observe\(\)|prometheus|@metrics" . --include="*.py" 2>/dev/null; then
+    EXCLUDES=$(echo "$MATCHES" | while IFS=: read -r file line content; do
+        grep -q "\.inc\(\)|\.observe\(\)|prometheus|@metrics" "$file" 2>/dev/null && echo "$file:$line:$content"
+    done)
+    if [ -n "$EXCLUDES" ]; then
         echo -e "${GREEN}✓${NC}"
     else
     echo -e "${YELLOW}⚠${NC}"
     echo "  🟡 WARNING: Critical service paths must export Prometheus metrics for SLI tracking"
     echo "     Fix: Add Prometheus counters and histograms to all critical paths"
+    echo ""
+    echo "     Files missing proper implementation:"
+    echo "$MATCHES" | while IFS=: read -r file line content; do
+        echo "       - ${CYAN}$file:$line${NC} → ${YELLOW}$(echo "$content" | xargs)${NC}"
+    done
     echo ""
     WARNINGS=$((WARNINGS + 1))
     fi
@@ -53,10 +62,16 @@ fi
 # ========================================
 echo -n "[2/5] Checking Metrics Endpoint... "
 
-if grep -rq "/metrics" . --include="*.py" --include="*.go" --include="*.js" --include="*.java" --include="*.scala" 2>/dev/null; then
+MATCHES=$(grep -rHn "/metrics" . --include="*.py" --include="*.go" --include="*.js" --include="*.java" --include="*.scala" 2>/dev/null || true)
+if [ -n "$MATCHES" ]; then
     echo -e "${YELLOW}⚠${NC}"
     echo "  🟡 WARNING: Service must expose /metrics endpoint for Prometheus to scrape"
     echo "     Fix: Expose /metrics endpoint with Prometheus client library"
+    echo ""
+    echo "     Violations found:"
+    echo "$MATCHES" | while IFS=: read -r file line content; do
+        echo "       - ${CYAN}$file:$line${NC} → ${YELLOW}$(echo "$content" | xargs)${NC}"
+    done
     echo ""
     WARNINGS=$((WARNINGS + 1))
 else
@@ -70,14 +85,23 @@ fi
 # ========================================
 echo -n "[3/5] Checking Central Error Logging... "
 
-if grep -rq "raise\s+\w+Error|return.*Exception" . --include="*.py" 2>/dev/null; then
+MATCHES=$(grep -rHn "raise\s+\w+Error|return.*Exception" . --include="*.py" 2>/dev/null || true)
+if [ -n "$MATCHES" ]; then
     # Check if exclude pattern also exists (good case)
-    if grep -rq "log\.|logger\.|logging\." . --include="*.py" 2>/dev/null; then
+    EXCLUDES=$(echo "$MATCHES" | while IFS=: read -r file line content; do
+        grep -q "log\.|logger\.|logging\." "$file" 2>/dev/null && echo "$file:$line:$content"
+    done)
+    if [ -n "$EXCLUDES" ]; then
         echo -e "${GREEN}✓${NC}"
     else
     echo -e "${YELLOW}⚠${NC}"
     echo "  🟡 WARNING: All errors must be centrally logged to SUMO Logic before being returned or raised"
     echo "     Fix: Add structured logging for all error paths (automatically sent to SUMO Logic)"
+    echo ""
+    echo "     Files missing proper implementation:"
+    echo "$MATCHES" | while IFS=: read -r file line content; do
+        echo "       - ${CYAN}$file:$line${NC} → ${YELLOW}$(echo "$content" | xargs)${NC}"
+    done
     echo ""
     WARNINGS=$((WARNINGS + 1))
     fi
@@ -90,14 +114,23 @@ fi
 # ========================================
 echo -n "[4/5] Checking Request Duration Tracking... "
 
-if grep -rq "@app\.route\(" . --include="*.py" 2>/dev/null; then
+MATCHES=$(grep -rHn "@app\.route\(" . --include="*.py" 2>/dev/null || true)
+if [ -n "$MATCHES" ]; then
     # Check if exclude pattern also exists (good case)
-    if grep -rq "Histogram|\.observe\(|\.time\(\)" . --include="*.py" 2>/dev/null; then
+    EXCLUDES=$(echo "$MATCHES" | while IFS=: read -r file line content; do
+        grep -q "Histogram|\.observe\(|\.time\(\)" "$file" 2>/dev/null && echo "$file:$line:$content"
+    done)
+    if [ -n "$EXCLUDES" ]; then
         echo -e "${GREEN}✓${NC}"
     else
     echo -e "${YELLOW}⚠${NC}"
     echo "  🟡 WARNING: All HTTP endpoints must track request duration for latency SLOs"
     echo "     Fix: Add Prometheus Histogram to track request duration"
+    echo ""
+    echo "     Files missing proper implementation:"
+    echo "$MATCHES" | while IFS=: read -r file line content; do
+        echo "       - ${CYAN}$file:$line${NC} → ${YELLOW}$(echo "$content" | xargs)${NC}"
+    done
     echo ""
     WARNINGS=$((WARNINGS + 1))
     fi
@@ -110,9 +143,13 @@ fi
 # ========================================
 echo -n "[5/5] Checking Request ID Propagation... "
 
-if grep -rq "requests\.(get|post|put|delete)" . --include="*.py" 2>/dev/null; then
+MATCHES=$(grep -rHn "requests\.(get|post|put|delete)" . --include="*.py" 2>/dev/null || true)
+if [ -n "$MATCHES" ]; then
     # Check if exclude pattern also exists (good case)
-    if grep -rq "X-Request-ID|request_id|correlation_id|trace_id" . --include="*.py" 2>/dev/null; then
+    EXCLUDES=$(echo "$MATCHES" | while IFS=: read -r file line content; do
+        grep -q "X-Request-ID|request_id|correlation_id|trace_id" "$file" 2>/dev/null && echo "$file:$line:$content"
+    done)
+    if [ -n "$EXCLUDES" ]; then
         echo -e "${GREEN}✓${NC}"
     else
     echo -e "${CYAN}ℹ${NC}"
@@ -129,7 +166,7 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo ""
 
 if [ $CRITICAL -eq 0 ] && [ $WARNINGS -eq 0 ] && [ $INFO -eq 0 ]; then
-    echo -e "${GREEN}${BOLD}✅ ALL TOP 5 CHECKS PASSED!${NC}"
+    echo -e "${GREEN}${BOLD}✅ ALL 5 CHECKS PASSED!${NC}"
     echo ""
     exit 0
 elif [ $CRITICAL -eq 0 ] && [ $WARNINGS -eq 0 ]; then

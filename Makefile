@@ -7,8 +7,8 @@ generate:
 	@echo "🔄 Generating from pattern YAML files..."
 	@python3 generators/generate-all-patterns.py
 	@echo ""
-	@echo "🔄 Generating Top 5 patterns..."
-	@python3 generators/generate-top5-patterns.py
+	@echo "🔄 Generating critical patterns..."
+	@python3 generators/generate-patterns.py
 
 # Validate YAML syntax
 validate:

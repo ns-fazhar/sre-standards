@@ -1,17 +1,17 @@
 ---
-name: observability-top5
-description: Top 5 observability patterns - visibility into service health
+name: observability
+description: Critical observability patterns - visibility into service health
 version: 1.0.0
-category: top5_observability
+category: critical_observability
 auto-generated: true
-languages: python, go, java, scala
+languages: python, go, java, scala, javascript, typescript
 ---
 
-# SRE Top 5: Observability
+# SRE Critical: Observability
 
 **Version**: 1.0.0
-**Last Updated**: 2026-04-23
-**Languages**: python, go, java, scala
+**Last Updated**: 2026-04-24
+**Languages**: python, go, java, scala, javascript, typescript
 
 ## Purpose
 
@@ -19,7 +19,7 @@ Patterns to ensure visibility into service health and performance
 
 **Confidence Level**: High (80-92% across patterns)
 
-This skill checks for the **Top 5 most critical patterns** in this category.
+This skill checks for **5 critical patterns** in this category.
 
 ## Usage
 
@@ -437,7 +437,7 @@ List any info severity findings
 ## Example Output
 
 ```
-🔍 SRE Top 5: Observability Results
+🔍 SRE Critical: Observability Results
 
 ✅ SUMMARY
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -477,7 +477,7 @@ Status: ⚠️  WARN - 1 critical issue, 2 warnings found
 
 ## Notes
 
-- This skill is auto-generated from `mappings/sre-top5-patterns.yaml`
+- This skill is auto-generated from `mappings/sre-patterns.yaml`
 - Enabled patterns controlled by `mappings/enabled-patterns.yaml`
 - To update: modify YAML and run `make generate`
 - Multi-language support: Python, Go, Java, Scala

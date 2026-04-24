@@ -1,9 +1,9 @@
 #!/bin/bash
-# Auto-generated from sre-top5-patterns.yaml v1.0.0
+# Auto-generated from sre-patterns.yaml v1.0.0
 # DO NOT EDIT MANUALLY - Regenerate with: make generate
 # Category: SRE Checks (Reliability & Resilience)
-# Patterns: Top 5 most critical
-# Languages: python, go, java, scala
+# Patterns: 5 critical checks
+# Languages: python, go, java, scala, javascript, typescript
 
 set -e
 
@@ -16,7 +16,7 @@ CYAN='\033[0;36m'
 BOLD='\033[1m'
 NC='\033[0m'
 
-echo -e "${BOLD}${BLUE}🔍 SRE Top 5: SRE Checks (Reliability & Resilience) (v1.0.0)${NC}"
+echo -e "${BOLD}${BLUE}🔍 SRE Critical: SRE Checks (Reliability & Resilience) (v1.0.0)${NC}"
 echo -e "${CYAN}Critical patterns to prevent outages and ensure resilient service behavior${NC}"
 echo -e "${CYAN}Confidence: High (85-95% across patterns)${NC}"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -33,14 +33,23 @@ INFO=0
 # ========================================
 echo -n "[1/5] Checking HTTP Timeout Protection... "
 
-if grep -rq "requests\.(get|post|put|delete|patch)\([^)]*\)" . --include="*.py" 2>/dev/null; then
+MATCHES=$(grep -rHn "requests\.(get|post|put|delete|patch)\([^)]*\)" . --include="*.py" 2>/dev/null || true)
+if [ -n "$MATCHES" ]; then
     # Check if exclude pattern also exists (good case)
-    if grep -rq "timeout\s*=" . --include="*.py" 2>/dev/null; then
+    EXCLUDES=$(echo "$MATCHES" | while IFS=: read -r file line content; do
+        grep -q "timeout\s*=" "$file" 2>/dev/null && echo "$file:$line:$content"
+    done)
+    if [ -n "$EXCLUDES" ]; then
         echo -e "${GREEN}✓${NC}"
     else
     echo -e "${RED}✗${NC}"
     echo "  🔴 BLOCKING: All HTTP calls must have timeout parameters to prevent indefinite hangs"
     echo "     Fix: Add timeout parameter to all HTTP calls"
+    echo ""
+    echo "     Files missing proper implementation:"
+    echo "$MATCHES" | while IFS=: read -r file line content; do
+        echo "       - ${CYAN}$file:$line${NC} → ${RED}$(echo "$content" | xargs)${NC}"
+    done
     echo ""
     CRITICAL=$((CRITICAL + 1))
     fi
@@ -53,14 +62,23 @@ fi
 # ========================================
 echo -n "[2/5] Checking Circuit Breaker for External Services... "
 
-if grep -rq "requests\.(get|post)" . --include="*.py" 2>/dev/null; then
+MATCHES=$(grep -rHn "requests\.(get|post)" . --include="*.py" 2>/dev/null || true)
+if [ -n "$MATCHES" ]; then
     # Check if exclude pattern also exists (good case)
-    if grep -rq "CircuitBreaker|pybreaker" . --include="*.py" 2>/dev/null; then
+    EXCLUDES=$(echo "$MATCHES" | while IFS=: read -r file line content; do
+        grep -q "CircuitBreaker|pybreaker" "$file" 2>/dev/null && echo "$file:$line:$content"
+    done)
+    if [ -n "$EXCLUDES" ]; then
         echo -e "${GREEN}✓${NC}"
     else
     echo -e "${RED}✗${NC}"
     echo "  🔴 BLOCKING: External service calls must be protected with circuit breaker pattern"
     echo "     Fix: Wrap external service calls with circuit breaker library"
+    echo ""
+    echo "     Files missing proper implementation:"
+    echo "$MATCHES" | while IFS=: read -r file line content; do
+        echo "       - ${CYAN}$file:$line${NC} → ${RED}$(echo "$content" | xargs)${NC}"
+    done
     echo ""
     CRITICAL=$((CRITICAL + 1))
     fi
@@ -73,7 +91,8 @@ fi
 # ========================================
 echo -n "[3/5] Checking Resource Leak Prevention... "
 
-if grep -rq "\.Get\(|\.Post\(|\.Do\(" . --include="*.go" 2>/dev/null; then
+MATCHES=$(grep -rHn "\.Get\(|\.Post\(|\.Do\(" . --include="*.go" 2>/dev/null || true)
+if [ -n "$MATCHES" ]; then
     echo -e "${GREEN}✓${NC}"
 else
     echo -e "${YELLOW}⚠${NC}"
@@ -90,14 +109,23 @@ fi
 # ========================================
 echo -n "[4/5] Checking Retry Logic with Exponential Backoff... "
 
-if grep -rq "requests\.(get|post|put|delete)" . --include="*.py" 2>/dev/null; then
+MATCHES=$(grep -rHn "requests\.(get|post|put|delete)" . --include="*.py" 2>/dev/null || true)
+if [ -n "$MATCHES" ]; then
     # Check if exclude pattern also exists (good case)
-    if grep -rq "@retry|tenacity|backoff" . --include="*.py" 2>/dev/null; then
+    EXCLUDES=$(echo "$MATCHES" | while IFS=: read -r file line content; do
+        grep -q "@retry|tenacity|backoff" "$file" 2>/dev/null && echo "$file:$line:$content"
+    done)
+    if [ -n "$EXCLUDES" ]; then
         echo -e "${GREEN}✓${NC}"
     else
     echo -e "${YELLOW}⚠${NC}"
     echo "  🟡 WARNING: External service calls should implement retry logic with exponential backoff"
     echo "     Fix: Implement retry with exponential backoff and jitter"
+    echo ""
+    echo "     Files missing proper implementation:"
+    echo "$MATCHES" | while IFS=: read -r file line content; do
+        echo "       - ${CYAN}$file:$line${NC} → ${YELLOW}$(echo "$content" | xargs)${NC}"
+    done
     echo ""
     WARNINGS=$((WARNINGS + 1))
     fi
@@ -110,10 +138,16 @@ fi
 # ========================================
 echo -n "[5/5] Checking Health & Readiness Endpoints... "
 
-if grep -rq "/health|/ready|/readiness|/healthz|/livez" . --include="*.py" --include="*.go" --include="*.js" --include="*.java" --include="*.scala" 2>/dev/null; then
+MATCHES=$(grep -rHn "/health|/ready|/readiness|/healthz|/livez" . --include="*.py" --include="*.go" --include="*.js" --include="*.java" --include="*.scala" 2>/dev/null || true)
+if [ -n "$MATCHES" ]; then
     echo -e "${YELLOW}⚠${NC}"
     echo "  🟡 WARNING: Service must expose /health and /ready endpoints for Kubernetes probes"
     echo "     Fix: Add /health (liveness) and /ready (readiness) endpoints"
+    echo ""
+    echo "     Violations found:"
+    echo "$MATCHES" | while IFS=: read -r file line content; do
+        echo "       - ${CYAN}$file:$line${NC} → ${YELLOW}$(echo "$content" | xargs)${NC}"
+    done
     echo ""
     WARNINGS=$((WARNINGS + 1))
 else
@@ -126,7 +160,7 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo ""
 
 if [ $CRITICAL -eq 0 ] && [ $WARNINGS -eq 0 ] && [ $INFO -eq 0 ]; then
-    echo -e "${GREEN}${BOLD}✅ ALL TOP 5 CHECKS PASSED!${NC}"
+    echo -e "${GREEN}${BOLD}✅ ALL 5 CHECKS PASSED!${NC}"
     echo ""
     exit 0
 elif [ $CRITICAL -eq 0 ] && [ $WARNINGS -eq 0 ]; then

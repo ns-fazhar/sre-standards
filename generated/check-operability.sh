@@ -1,9 +1,9 @@
 #!/bin/bash
-# Auto-generated from sre-top5-patterns.yaml v1.0.0
+# Auto-generated from sre-patterns.yaml v1.0.0
 # DO NOT EDIT MANUALLY - Regenerate with: make generate
 # Category: Operability
-# Patterns: Top 5 most critical
-# Languages: python, go, java, scala
+# Patterns: 5 critical checks
+# Languages: python, go, java, scala, javascript, typescript
 
 set -e
 
@@ -16,7 +16,7 @@ CYAN='\033[0;36m'
 BOLD='\033[1m'
 NC='\033[0m'
 
-echo -e "${BOLD}${BLUE}🔍 SRE Top 5: Operability (v1.0.0)${NC}"
+echo -e "${BOLD}${BLUE}🔍 SRE Critical: Operability (v1.0.0)${NC}"
 echo -e "${CYAN}Patterns to ensure services can be operated, debugged, and maintained${NC}"
 echo -e "${CYAN}Confidence: High (75-99% across patterns)${NC}"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -33,7 +33,8 @@ INFO=0
 # ========================================
 echo -n "[1/5] Checking No Hardcoded Secrets... "
 
-if grep -rq "(password|api_key|secret|token|aws_access_key|private_key)\s*=\s*['\"]([a-zA-Z0-9+/=]{20,})['\"]" . --include="*.py" --include="*.go" --include="*.js" --include="*.java" --include="*.scala" --include="*.yaml" --include="*.yml" 2>/dev/null; then
+MATCHES=$(grep -rHn "(password|api_key|secret|token|aws_access_key|private_key)\s*=\s*['\"]([a-zA-Z0-9+/=]{20,})['\"]" . --include="*.py" --include="*.go" --include="*.js" --include="*.java" --include="*.scala" --include="*.yaml" --include="*.yml" 2>/dev/null || true)
+if [ -n "$MATCHES" ]; then
     echo -e "${GREEN}✓${NC}"
 else
     echo -e "${RED}✗${NC}"
@@ -50,14 +51,23 @@ fi
 # ========================================
 echo -n "[2/5] Checking Graceful Shutdown... "
 
-if grep -rq "func main\(\)" . --include="*.go" 2>/dev/null; then
+MATCHES=$(grep -rHn "func main\(\)" . --include="*.go" 2>/dev/null || true)
+if [ -n "$MATCHES" ]; then
     # Check if exclude pattern also exists (good case)
-    if grep -rq "signal\.Notify|syscall\.SIGTERM|syscall\.SIGINT" . --include="*.go" 2>/dev/null; then
+    EXCLUDES=$(echo "$MATCHES" | while IFS=: read -r file line content; do
+        grep -q "signal\.Notify|syscall\.SIGTERM|syscall\.SIGINT" "$file" 2>/dev/null && echo "$file:$line:$content"
+    done)
+    if [ -n "$EXCLUDES" ]; then
         echo -e "${GREEN}✓${NC}"
     else
     echo -e "${YELLOW}⚠${NC}"
     echo "  🟡 WARNING: Service must handle SIGTERM gracefully to avoid dropping in-flight requests"
     echo "     Fix: Implement signal handlers to gracefully drain connections before shutdown"
+    echo ""
+    echo "     Files missing proper implementation:"
+    echo "$MATCHES" | while IFS=: read -r file line content; do
+        echo "       - ${CYAN}$file:$line${NC} → ${YELLOW}$(echo "$content" | xargs)${NC}"
+    done
     echo ""
     WARNINGS=$((WARNINGS + 1))
     fi
@@ -70,7 +80,8 @@ fi
 # ========================================
 echo -n "[3/5] Checking Environment Variables Documented... "
 
-if grep -rq "os\.getenv\(|os\.environ\[|os\.environ\.get\(" . --include="*.py" 2>/dev/null; then
+MATCHES=$(grep -rHn "os\.getenv\(|os\.environ\[|os\.environ\.get\(" . --include="*.py" 2>/dev/null || true)
+if [ -n "$MATCHES" ]; then
     echo -e "${GREEN}✓${NC}"
 else
     echo -e "${CYAN}ℹ${NC}"
@@ -103,9 +114,13 @@ fi
 # ========================================
 echo -n "[5/5] Checking Configuration Validation... "
 
-if grep -rq "yaml\.load\(|json\.load\(|configparser\." . --include="*.py" 2>/dev/null; then
+MATCHES=$(grep -rHn "yaml\.load\(|json\.load\(|configparser\." . --include="*.py" 2>/dev/null || true)
+if [ -n "$MATCHES" ]; then
     # Check if exclude pattern also exists (good case)
-    if grep -rq "validate|schema|pydantic|marshmallow" . --include="*.py" 2>/dev/null; then
+    EXCLUDES=$(echo "$MATCHES" | while IFS=: read -r file line content; do
+        grep -q "validate|schema|pydantic|marshmallow" "$file" 2>/dev/null && echo "$file:$line:$content"
+    done)
+    if [ -n "$EXCLUDES" ]; then
         echo -e "${GREEN}✓${NC}"
     else
     echo -e "${CYAN}ℹ${NC}"
@@ -122,7 +137,7 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo ""
 
 if [ $CRITICAL -eq 0 ] && [ $WARNINGS -eq 0 ] && [ $INFO -eq 0 ]; then
-    echo -e "${GREEN}${BOLD}✅ ALL TOP 5 CHECKS PASSED!${NC}"
+    echo -e "${GREEN}${BOLD}✅ ALL 5 CHECKS PASSED!${NC}"
     echo ""
     exit 0
 elif [ $CRITICAL -eq 0 ] && [ $WARNINGS -eq 0 ]; then

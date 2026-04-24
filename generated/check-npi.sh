@@ -1,9 +1,9 @@
 #!/bin/bash
-# Auto-generated from sre-top5-patterns.yaml v1.0.0
+# Auto-generated from sre-patterns.yaml v1.0.0
 # DO NOT EDIT MANUALLY - Regenerate with: make generate
 # Category: NPI (New Product Introduction)
-# Patterns: Top 5 most critical
-# Languages: python, go, java, scala
+# Patterns: 5 critical checks
+# Languages: python, go, java, scala, javascript, typescript
 # Branch Requirement: Feature branch (compares against main)
 
 set -e
@@ -21,7 +21,7 @@ NC='\033[0m'
 CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
 BASE_BRANCH="${BASE_BRANCH:-main}"
 
-echo -e "${BOLD}${BLUE}🔍 SRE Top 5: NPI (New Product Introduction) (v1.0.0)${NC}"
+echo -e "${BOLD}${BLUE}🔍 SRE Critical: NPI (New Product Introduction) (v1.0.0)${NC}"
 echo -e "${CYAN}Patterns to validate new features and changes before production release${NC}"
 echo -e "${CYAN}Confidence: High (82-99% across patterns)${NC}"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -37,10 +37,10 @@ if [ "$CURRENT_BRANCH" = "main" ] || [ "$CURRENT_BRANCH" = "master" ]; then
     echo ""
     echo "Usage: Switch to your feature branch first, or set BASE_BRANCH:"
     echo "  git checkout feature/my-new-feature"
-    echo "  ./check-npi-top5.sh"
+    echo "  ./check-npi.sh"
     echo ""
     echo "Or specify base branch:"
-    echo "  BASE_BRANCH=main ./check-npi-top5.sh"
+    echo "  BASE_BRANCH=main ./check-npi.sh"
     echo ""
 fi
 
@@ -86,7 +86,8 @@ INFO=0
 # ========================================
 echo -n "[1/5] Checking SQL Injection Prevention... "
 
-if git diff --name-only $BASE_BRANCH..HEAD | xargs -I {} grep -H "(execute|executemany)\s*\([^)]*(%s|%d|\+|f\"|f'|\.format)" {} 2>/dev/null | grep -E '(\.py)' >/dev/null 2>&1; then
+MATCHES=$(git diff --name-only $BASE_BRANCH..HEAD | xargs -I {} grep -Hn "(execute|executemany)\s*\([^)]*(%s|%d|\+|f\"|f'|\.format)" {} 2>/dev/null | grep -E '(\.py)' || true)
+if [ -n "$MATCHES" ]; then
     echo -e "${GREEN}✓${NC}"
 else
     echo -e "${RED}✗${NC}"
@@ -103,14 +104,23 @@ fi
 # ========================================
 echo -n "[2/5] Checking Feature Flag for New Features... "
 
-if git diff --name-only $BASE_BRANCH..HEAD | xargs -I {} grep -H "@app\.route\(|@router\.(get|post|put|delete)" {} 2>/dev/null | grep -E '(\.py)' >/dev/null 2>&1; then
+MATCHES=$(git diff --name-only $BASE_BRANCH..HEAD | xargs -I {} grep -Hn "@app\.route\(|@router\.(get|post|put|delete)" {} 2>/dev/null | grep -E '(\.py)' || true)
+if [ -n "$MATCHES" ]; then
     # Check if exclude pattern also exists (good case)
-    if git diff --name-only $BASE_BRANCH..HEAD | xargs -I {} grep -H "feature_flag|FeatureFlag|flag_enabled|LaunchDarkly" {} 2>/dev/null | grep -E '(\.py)' >/dev/null 2>&1; then
+    EXCLUDES=$(echo "$MATCHES" | while IFS=: read -r file line content; do
+        grep -q "feature_flag|FeatureFlag|flag_enabled|LaunchDarkly" "$file" 2>/dev/null && echo "$file:$line:$content"
+    done)
+    if [ -n "$EXCLUDES" ]; then
         echo -e "${GREEN}✓${NC}"
     else
     echo -e "${YELLOW}⚠${NC}"
     echo "  🟡 WARNING: New features must be protected with feature flags for safe rollout"
     echo "     Fix: Wrap new features in feature flags (LaunchDarkly, Unleash, Togglz)"
+    echo ""
+    echo "     Files missing proper implementation:"
+    echo "$MATCHES" | while IFS=: read -r file line content; do
+        echo "       - ${CYAN}$file:$line${NC} → ${YELLOW}$(echo "$content" | xargs)${NC}"
+    done
     echo ""
     WARNINGS=$((WARNINGS + 1))
     fi
@@ -130,7 +140,8 @@ echo -n "[3/5] Checking Database Schema Changes with Migration... "
 # ========================================
 echo -n "[4/5] Checking API Breaking Changes Detection... "
 
-if git diff --name-only $BASE_BRANCH..HEAD | xargs -I {} grep -H "DROP\s+TABLE|DROP\s+COLUMN|RENAME\s+COLUMN" {} 2>/dev/null | grep -E '(\.sql|*/migrations/*)' >/dev/null 2>&1; then
+MATCHES=$(git diff --name-only $BASE_BRANCH..HEAD | xargs -I {} grep -Hn "DROP\s+TABLE|DROP\s+COLUMN|RENAME\s+COLUMN" {} 2>/dev/null | grep -E '(\.sql|*/migrations/*)' || true)
+if [ -n "$MATCHES" ]; then
     echo -e "${GREEN}✓${NC}"
 else
     echo -e "${YELLOW}⚠${NC}"
@@ -153,7 +164,7 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo ""
 
 if [ $CRITICAL -eq 0 ] && [ $WARNINGS -eq 0 ] && [ $INFO -eq 0 ]; then
-    echo -e "${GREEN}${BOLD}✅ ALL TOP 5 CHECKS PASSED!${NC}"
+    echo -e "${GREEN}${BOLD}✅ ALL 5 CHECKS PASSED!${NC}"
     echo ""
     exit 0
 elif [ $CRITICAL -eq 0 ] && [ $WARNINGS -eq 0 ]; then

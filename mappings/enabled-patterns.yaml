@@ -1,0 +1,31 @@
+# Enabled patterns for each category
+# Generated from sre-patterns.yaml
+# Enable/disable specific patterns by ID
+
+sre_checks:
+  - http_timeouts
+  - circuit_breaker
+  - resource_leak
+  - retry_exponential_backoff
+  - health_readiness
+
+operability:
+  - no_hardcoded_secrets
+  - graceful_shutdown
+  - env_vars_documented
+  - dockerfile_present
+  - config_validation
+
+observability:
+  - metrics_instrumentation
+  - metrics_endpoint
+  - central_logging
+  - duration_metrics
+  - request_id_propagation
+
+npi:
+  - sql_injection
+  - feature_flag_detection
+  - database_migrations
+  - api_breaking_changes
+  - test_coverage

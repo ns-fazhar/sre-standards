@@ -1,19 +1,19 @@
 ---
-name: npi-top5
-description: Top 5 NPI patterns - validate new features safely
+name: npi
+description: Critical NPI patterns - validate new features safely
 version: 1.0.0
-category: top5_npi
+category: critical_npi
 auto-generated: true
-languages: python, go, java, scala
+languages: python, go, java, scala, javascript, typescript
 branch_requirement: feature_branch
 branch_compare: main
 ---
 
-# SRE Top 5: NPI (New Product Introduction)
+# SRE Critical: NPI (New Product Introduction)
 
 **Version**: 1.0.0
-**Last Updated**: 2026-04-23
-**Languages**: python, go, java, scala
+**Last Updated**: 2026-04-24
+**Languages**: python, go, java, scala, javascript, typescript
 
 ## Purpose
 
@@ -21,7 +21,7 @@ Patterns to validate new features and changes before production release
 
 **Confidence Level**: High (82-99% across patterns)
 
-This skill checks for the **Top 5 most critical patterns** in this category.
+This skill checks for **5 critical patterns** in this category.
 
 ## ⚠️ Branch Requirement
 
@@ -36,10 +36,10 @@ NPI checks must be run on feature branches, comparing changes against main branc
 git checkout feature/new-payment-flow
 
 # Run NPI checks (compares against main)
-./generated/check-npi-top5.sh
+./generated/check-npi-critical.sh
 
 # Or specify a different base branch
-BASE_BRANCH=develop ./generated/check-npi-top5.sh
+BASE_BRANCH=develop ./generated/check-npi-critical.sh
 ```
 
 ### Why Feature Branches?
@@ -436,7 +436,7 @@ List any info severity findings
 ## Example Output
 
 ```
-🔍 SRE Top 5: NPI (New Product Introduction) Results
+🔍 SRE Critical: NPI (New Product Introduction) Results
 
 ✅ SUMMARY
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -476,7 +476,7 @@ Status: ⚠️  WARN - 1 critical issue, 2 warnings found
 
 ## Notes
 
-- This skill is auto-generated from `mappings/sre-top5-patterns.yaml`
+- This skill is auto-generated from `mappings/sre-patterns.yaml`
 - Enabled patterns controlled by `mappings/enabled-patterns.yaml`
 - To update: modify YAML and run `make generate`
 - Multi-language support: Python, Go, Java, Scala

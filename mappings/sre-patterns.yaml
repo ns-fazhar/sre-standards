@@ -1,12 +1,12 @@
-# SRE Top 5 Patterns - Priority Checks by Category
+# SRE Critical Patterns - Priority Checks by Category
 # Owner: SRE Team
 # Auto-generates skills and scripts via: make generate
 
 metadata:
   version: "1.0.0"
-  last_updated: "2026-04-23"
+  last_updated: "2026-04-24"
   maintainer: "SRE Team"
-  description: "Top 5 most critical patterns for each SRE category"
+  description: "Most critical patterns for each SRE category"
   languages_supported: ["python", "go", "java", "scala", "javascript", "typescript"]
   observability_stack:
     metrics: "Prometheus"
