@@ -161,7 +161,8 @@ sre_checks:
 
         - language: go
           pattern: 'http\.Client|grpc\.Dial|mwaa\.New|s3\.New|dynamodb\.New|rds\.New|sql\.Open|clickhouse\.Open|pgx\.Connect|redis\.NewClient|\.Dial\(|Client\{\}'
-          exclude: 'hystrix|circuitbreaker|gobreaker|CircuitBreaker|type CircuitBreaker|State.*Closed.*Open.*HalfOpen'
+          exclude: 'package.*breaker|type.*CircuitBreaker|gobreaker\.New|CircuitBreaker\s*struct|State.*Closed.*Open.*HalfOpen'
+          exclude_files: ["*_test.go"]
           file_types: ["*.go"]
           message: "External service calls (HTTP/gRPC/AWS SDK/Database/Cache) without circuit breaker protection"
 
