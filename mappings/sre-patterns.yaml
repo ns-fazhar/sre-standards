@@ -1060,7 +1060,6 @@ observability:
         - language: all
           pattern: '/metrics'
           file_types: ["*.py", "*.go", "*.js", "*.java", "*.scala"]
-          invert: true
           message: "No /metrics endpoint found for Prometheus scraping"
 
       guidance:

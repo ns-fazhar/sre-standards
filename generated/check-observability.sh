@@ -68,19 +68,13 @@ echo -n "[2/5] Checking Metrics Endpoint... "
 
 MATCHES=$(grep -rHn "/metrics" . --include="*.py" --include="*.go" --include="*.js" --include="*.java" --include="*.scala" 2>/dev/null || true)
 if [ -n "$MATCHES" ]; then
+    echo -e "${GREEN}✓${NC}"
+else
     echo -e "${YELLOW}⚠${NC}"
     echo "  🟡 WARNING: Service must expose /metrics endpoint for Prometheus to scrape"
     echo "     Fix: Expose /metrics endpoint with Prometheus client library"
     echo ""
-    echo "     Violations found:"
-    while IFS=: read -r file line content; do
-        [ -z "$file" ] && continue
-        echo "       - ${CYAN}$file:$line${NC} → ${YELLOW}$(echo "$content" | xargs)${NC}"
-    done <<< "$MATCHES"
-    echo ""
     WARNINGS=$((WARNINGS + 1))
-else
-    echo -e "${GREEN}✓${NC}"
 fi
 
 # ========================================
