@@ -33,12 +33,12 @@ INFO=0
 # ========================================
 echo -n "[1/5] Checking HTTP Timeout Protection... "
 
-MATCHES=$(grep -rHnE "requests\.(get|post|put|delete|patch)\([^)]*\)" . --include="*.py" 2>/dev/null || true)
+MATCHES=$(grep -rHnE "requests\.(get|post|put|delete|patch)\([^)]*\)|boto3\.client" . --include="*.py" 2>/dev/null || true)
 if [ -n "$MATCHES" ]; then
     # Check if exclude pattern also exists (good case)
     BAD_MATCHES=""
     while IFS=: read -r file line content; do
-        if ! grep -q "timeout\s*=" "$file" 2>/dev/null; then
+        if ! grep -q "timeout\s*=|read_timeout|connect_timeout" "$file" 2>/dev/null; then
             BAD_MATCHES="${BAD_MATCHES}$file:$line:$content"$'\n'
         fi
     done <<< "$MATCHES"
@@ -66,7 +66,7 @@ fi
 # ========================================
 echo -n "[2/5] Checking Circuit Breaker for External Services... "
 
-MATCHES=$(grep -rHnE "requests\.(get|post)" . --include="*.py" 2>/dev/null || true)
+MATCHES=$(grep -rHnE "requests\.(get|post)|boto3\.client" . --include="*.py" 2>/dev/null || true)
 if [ -n "$MATCHES" ]; then
     # Check if exclude pattern also exists (good case)
     BAD_MATCHES=""
@@ -132,12 +132,12 @@ fi
 # ========================================
 echo -n "[4/5] Checking Retry Logic with Exponential Backoff... "
 
-MATCHES=$(grep -rHnE "requests\.(get|post|put|delete)" . --include="*.py" 2>/dev/null || true)
+MATCHES=$(grep -rHnE "requests\.(get|post|put|delete)|boto3\.client" . --include="*.py" 2>/dev/null || true)
 if [ -n "$MATCHES" ]; then
     # Check if exclude pattern also exists (good case)
     BAD_MATCHES=""
     while IFS=: read -r file line content; do
-        if ! grep -q "@retry|tenacity|backoff" "$file" 2>/dev/null; then
+        if ! grep -q "@retry|tenacity|backoff|botocore\.config\.Config.*retries" "$file" 2>/dev/null; then
             BAD_MATCHES="${BAD_MATCHES}$file:$line:$content"$'\n'
         fi
     done <<< "$MATCHES"

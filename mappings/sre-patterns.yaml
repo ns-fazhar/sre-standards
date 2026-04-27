@@ -34,31 +34,38 @@ sre_checks:
       detection:
         # Python - requests without timeout
         - language: python
-          pattern: 'requests\.(get|post|put|delete|patch)\([^)]*\)'
-          exclude: 'timeout\s*='
+          pattern: 'requests\.(get|post|put|delete|patch)\([^)]*\)|boto3\.client'
+          exclude: 'timeout\s*=|read_timeout|connect_timeout'
           file_types: ["*.py"]
-          message: "HTTP call without timeout parameter"
+          message: "HTTP call or AWS client without timeout parameter"
 
         # Go - http.Client without timeout
         - language: go
-          pattern: 'http\.Client\s*\{'
+          pattern: 'http\.Client\s*\{|http\.Client\{\}|&http\.Client\{\}'
           exclude: 'Timeout\s*:'
           file_types: ["*.go"]
           message: "http.Client without Timeout field"
 
+        # Go - AWS SDK without timeout
+        - language: go
+          pattern: 'awsconfig\.LoadDefaultConfig|config\.LoadDefaultConfig'
+          exclude: 'WithHTTPClient|HTTPClient'
+          file_types: ["*.go"]
+          message: "AWS SDK config without explicit HTTP client timeout"
+
         # Java - RestTemplate/HttpClient without timeout
         - language: java
-          pattern: 'new RestTemplate\(\)|HttpClient\.newHttpClient\(\)'
-          exclude: 'setConnectTimeout|setReadTimeout|connectTimeout'
+          pattern: 'new RestTemplate\(\)|HttpClient\.newHttpClient\(\)|AmazonDynamoDBClientBuilder|AmazonS3ClientBuilder'
+          exclude: 'setConnectTimeout|setReadTimeout|connectTimeout|withClientConfiguration'
           file_types: ["*.java"]
-          message: "HTTP client without timeout configuration"
+          message: "HTTP client or AWS client without timeout configuration"
 
         # JavaScript/Node.js - axios/fetch without timeout
         - language: javascript
-          pattern: 'axios\.(get|post|put|delete|patch)\([^)]*\)|fetch\([^)]*\)'
-          exclude: 'timeout\s*:|signal\s*:'
+          pattern: 'axios\.(get|post|put|delete|patch)\([^)]*\)|fetch\([^)]*\)|new AWS\.'
+          exclude: 'timeout\s*:|signal\s*:|httpOptions'
           file_types: ["*.js", "*.ts", "*.jsx", "*.tsx"]
-          message: "HTTP call without timeout (axios) or AbortSignal (fetch)"
+          message: "HTTP call or AWS client without timeout"
 
       guidance:
         description: "All HTTP calls must have timeout parameters to prevent indefinite hangs"
@@ -147,25 +154,25 @@ sre_checks:
 
       detection:
         - language: python
-          pattern: 'requests\.(get|post)'
+          pattern: 'requests\.(get|post)|boto3\.client'
           exclude: 'CircuitBreaker|pybreaker'
           file_types: ["*.py"]
           message: "External service calls without circuit breaker protection"
 
         - language: go
-          pattern: 'http\.Client|grpc\.Dial'
-          exclude: 'hystrix|circuitbreaker|gobreaker'
+          pattern: 'http\.Client|grpc\.Dial|mwaa\.New|s3\.New|dynamodb\.New|rds\.New|sql\.Open|clickhouse\.Open|pgx\.Connect|redis\.NewClient|\.Dial\(|Client\{\}'
+          exclude: 'hystrix|circuitbreaker|gobreaker|CircuitBreaker|type CircuitBreaker|State.*Closed.*Open.*HalfOpen'
           file_types: ["*.go"]
-          message: "External service calls without circuit breaker protection"
+          message: "External service calls (HTTP/gRPC/AWS SDK/Database/Cache) without circuit breaker protection"
 
         - language: javascript
-          pattern: 'axios\.|fetch\('
+          pattern: 'axios\.|fetch\(|AWS\.'
           exclude: 'opossum|circuitBreaker|Breaker'
           file_types: ["*.js", "*.ts", "*.jsx", "*.tsx"]
           message: "External service calls without circuit breaker protection"
 
         - language: java
-          pattern: 'RestTemplate|WebClient|HttpClient'
+          pattern: 'RestTemplate|WebClient|HttpClient|AmazonDynamoDB|AmazonS3|AWSClient'
           exclude: 'CircuitBreaker|@HystrixCommand|Resilience4j'
           file_types: ["*.java"]
           message: "External service calls without circuit breaker protection"
@@ -345,20 +352,27 @@ sre_checks:
 
       detection:
         - language: python
-          pattern: 'requests\.(get|post|put|delete)'
-          exclude: '@retry|tenacity|backoff'
+          pattern: 'requests\.(get|post|put|delete)|boto3\.client'
+          exclude: '@retry|tenacity|backoff|botocore\.config\.Config.*retries'
           file_types: ["*.py"]
           message: "External call without retry logic"
 
         - language: go
-          pattern: 'http\.Client|grpc\.Dial'
-          exclude: 'retry|Retry|backoff'
+          pattern: 'http\.Client|grpc\.Dial|mwaa\.New|s3\.New'
+          exclude: 'retry|Retry|backoff|Backoff|RetryPolicy|MaxRetries'
           file_types: ["*.go"]
           message: "External call without retry logic"
 
+        # Go - Check for message queue retry policies (positive check)
+        - language: go
+          pattern: 'RetryPolicy|NackRedeliveryDelay|MaxDeliveryAttempts'
+          file_types: ["*.go"]
+          message: "Message queue retry policy found (GOOD)"
+          severity: info
+
         - language: java
-          pattern: 'RestTemplate|HttpClient'
-          exclude: 'RetryTemplate|@Retryable|Resilience4j'
+          pattern: 'RestTemplate|HttpClient|AmazonDynamoDB|AmazonS3'
+          exclude: 'RetryTemplate|@Retryable|Resilience4j|RetryPolicy'
           file_types: ["*.java"]
           message: "External call without retry logic"
 
