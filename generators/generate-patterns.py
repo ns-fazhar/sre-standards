@@ -83,23 +83,7 @@ def generate_skill_markdown(category_key: str, patterns_data: Dict, enabled_patt
     branch_compare = category_data.get('branch_compare', 'main')
     usage_note = category_data.get('usage_note', '')
 
-    doc = f"""---
-name: {category_info['skill_name']}
-description: {category_info['description']}
-version: {metadata['version']}
-category: critical_{category_key}
-auto-generated: true
-languages: {', '.join(metadata['languages_supported'])}
-"""
-
-    if is_npi:
-        doc += f"""branch_requirement: {branch_requirement}
-branch_compare: {branch_compare}
-"""
-
-    doc += f"""---
-
-# SRE Critical: {category_info['name']}
+    doc = f"""# SRE Critical: {category_info['name']}
 
 **Version**: {metadata['version']}
 **Last Updated**: {metadata['last_updated']}

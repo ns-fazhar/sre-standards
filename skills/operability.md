@@ -1,12 +1,3 @@
----
-name: operability
-description: Critical operability patterns - ensure maintainable services
-version: 1.0.0
-category: critical_operability
-auto-generated: true
-languages: python, go, java, scala, javascript, typescript
----
-
 # SRE Critical: Operability
 
 **Version**: 1.0.0

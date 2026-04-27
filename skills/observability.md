@@ -1,12 +1,3 @@
----
-name: observability
-description: Critical observability patterns - visibility into service health
-version: 1.0.0
-category: critical_observability
-auto-generated: true
-languages: python, go, java, scala, javascript, typescript
----
-
 # SRE Critical: Observability
 
 **Version**: 1.0.0

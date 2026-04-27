@@ -1,14 +1,3 @@
----
-name: npi
-description: Critical NPI patterns - validate new features safely
-version: 1.0.0
-category: critical_npi
-auto-generated: true
-languages: python, go, java, scala, javascript, typescript
-branch_requirement: feature_branch
-branch_compare: main
----
-
 # SRE Critical: NPI (New Product Introduction)
 
 **Version**: 1.0.0

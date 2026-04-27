@@ -70,15 +70,7 @@ def generate_skill_markdown(category_key: str, patterns_data: Dict, enabled_patt
         print(f"⚠️  No enabled patterns for {category_key}, skipping skill generation")
         return
 
-    doc = f"""---
-name: {category_info['skill_name']}
-description: {category_info['description']}
-version: {metadata['version']}
-category: {category_key}
-auto-generated: true
----
-
-# SRE {category_info['name']} Check Skill
+    doc = f"""# SRE {category_info['name']} Check Skill
 
 **Version**: {metadata['version']}
 **Last Updated**: {metadata['last_updated']}

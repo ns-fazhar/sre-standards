@@ -1,12 +1,3 @@
----
-name: sre-checks
-description: Critical reliability and resilience patterns - prevent outages
-version: 1.0.0
-category: critical_sre_checks
-auto-generated: true
-languages: python, go, java, scala, javascript, typescript
----
-
 # SRE Critical: SRE Checks (Reliability & Resilience)
 
 **Version**: 1.0.0
